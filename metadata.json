@@ -1,0 +1,7 @@
+{
+  "name": "TradeSphere - Modern B2B & B2C Marketplace",
+  "description": "Secure, modern, responsive marketplace platform for businesses and individuals to showcase offerings, publish products, manage orders, and connect via direct inquiries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
