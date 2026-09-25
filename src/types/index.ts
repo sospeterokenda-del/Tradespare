@@ -1,4 +1,5 @@
-export type UserRole = 'customer' | 'seller' | 'admin';
+export type UserRole = 'admin' | 'seller' | 'buyer' | 'customer';
+export type UserStatus = 'pending' | 'active' | 'suspended' | 'rejected';
 
 export interface User {
   id: string;
@@ -6,12 +7,16 @@ export interface User {
   email: string;
   phone: string;
   role: UserRole;
+  status: UserStatus;
   avatar: string;
   verified: boolean;
   businessId?: string;
+  businessName?: string;
   location: string;
   bio?: string;
   createdAt: string;
+  updatedAt?: string;
+  rejectionReason?: string;
 }
 
 export interface BusinessProfile {
@@ -187,7 +192,7 @@ export interface AdminDetails {
     supportPhone: string;
     businessAddress: string;
     timeZone: string;
-    defaultCurrency: 'KES' | 'USD' | 'EUR' | 'GBP';
+    defaultCurrency: 'KES' | 'USD';
     announcementBanner: {
       active: boolean;
       text: string;

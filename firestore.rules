@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Explicit Admin verification
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email is string && request.auth.token.email == 'sospeterokenda@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Check if the current user profile exists and is active
+    function isApprovedSeller() {
+      return isSignedIn() && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller' &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'
+        )
+      );
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'
+        )
+      );
+    }
+
+    // Users Collection Validation Helper
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'name', 'email', 'role', 'status', 'createdAt']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+        data.email is string && data.email.size() > 0 && data.email.size() <= 150 &&
+        data.role in ['admin', 'seller', 'buyer'] &&
+        data.status in ['pending', 'active', 'suspended', 'rejected'] &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      // Registration & Profile Creation
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUser(incoming()) &&
+        incoming().id == request.auth.uid &&
+        // Non-admins cannot register as admin
+        (isAdmin() || incoming().role != 'admin') &&
+        // Sellers must start as pending for admin approval; buyers can be active
+        (isAdmin() || (incoming().role == 'seller' ? incoming().status == 'pending' : incoming().status == 'active'));
+
+      // Profile Update
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        (
+          // Admin can manage everything including roles, approval status, and suspensions
+          isAdmin() ||
+          (
+            // User updating their own profile
+            request.auth.uid == userId &&
+            isValidUser(incoming()) &&
+            // Immutable identity and governance fields: cannot change own role or status
+            incoming().id == existing().id &&
+            incoming().email == existing().email &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'phone', 'avatar', 'businessName', 'location', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // ADMINS WHITELIST COLLECTION
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Product Entity Validator
+    function isValidProduct(data) {
+      return data.keys().hasAll(['id', 'title', 'category', 'price', 'stock', 'sellerId', 'status', 'createdAt']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+        data.category is string && data.category.size() <= 80 &&
+        data.price is number && data.price >= 0 &&
+        data.stock is number && data.stock >= 0 &&
+        data.sellerId is string && data.sellerId.size() <= 128 &&
+        data.status in ['active', 'pending', 'draft', 'archived', 'rejected'] &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // PRODUCTS COLLECTION
+    match /products/{productId} {
+      // Anyone can view active products; seller can view their own listings; admin can view all
+      allow get: if (existing().status == 'active') ||
+        (isSignedIn() && (existing().sellerId == request.auth.uid || isAdmin()));
+
+      allow list: if true; // Public catalog browsing for marketplace buyers
+
+      // Only approved active sellers or admins can create products
+      allow create: if isSignedIn() &&
+        isValidId(productId) &&
+        isValidProduct(incoming()) &&
+        (isAdmin() || (isApprovedSeller() && incoming().sellerId == request.auth.uid));
+
+      // Sellers can only update their own products; admins can update all
+      allow update: if isSignedIn() &&
+        isValidId(productId) &&
+        isValidProduct(incoming()) &&
+        (
+          isAdmin() || (
+            isApprovedSeller() &&
+            existing().sellerId == request.auth.uid &&
+            incoming().sellerId == existing().sellerId
+          )
+        );
+
+      // Sellers can only delete their own products; admins can delete any
+      allow delete: if isSignedIn() &&
+        isValidId(productId) &&
+        (
+          isAdmin() || (
+            isApprovedSeller() &&
+            existing().sellerId == request.auth.uid
+          )
+        );
+    }
+
+    // Order Entity Validator
+    function isValidOrder(data) {
+      return data.keys().hasAll(['id', 'orderNumber', 'buyerId', 'totalAmount', 'orderStatus', 'createdAt']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.orderNumber is string && data.orderNumber.size() <= 50 &&
+        data.buyerId is string && data.buyerId.size() <= 128 &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        data.orderStatus in ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'] &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // ORDERS COLLECTION
+    match /orders/{orderId} {
+      allow get: if isSignedIn() &&
+        (existing().buyerId == request.auth.uid || isAdmin());
+
+      allow list: if isSignedIn() &&
+        (resource.data.buyerId == request.auth.uid || isAdmin());
+
+      // Only active buyers or admins can place orders
+      allow create: if isSignedIn() &&
+        isValidId(orderId) &&
+        isValidOrder(incoming()) &&
+        (isAdmin() || (isActiveUser() && incoming().buyerId == request.auth.uid));
+
+      allow update: if isSignedIn() &&
+        isValidId(orderId) &&
+        (
+          isAdmin() || (
+            existing().buyerId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['orderStatus', 'notes'])
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+  }
+}

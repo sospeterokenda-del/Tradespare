@@ -236,10 +236,25 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
     const errs: Record<string, string> = {};
     if (!title.trim()) errs.title = 'Product title is required';
     if (!description.trim()) errs.description = 'Product description is required';
-    if (price === '' || Number(price) <= 0) errs.price = 'Valid price is required';
-    if (discountPrice !== '' && Number(discountPrice) >= Number(price)) {
-      errs.discountPrice = 'Discount price must be lower than original price';
+    // KES Currency & Pricing Validation
+    if (price === '' || isNaN(Number(price)) || Number(price) <= 0) {
+      errs.price = 'Valid price in KES (greater than KSh 0) is required';
+    } else if (Number(price) > 1000000000) {
+      errs.price = 'Price exceeds maximum allowable KES limit (KSh 1,000,000,000)';
     }
+
+    if (discountPrice !== '') {
+      if (isNaN(Number(discountPrice)) || Number(discountPrice) <= 0) {
+        errs.discountPrice = 'Discount price must be a valid KES amount greater than 0';
+      } else if (Number(discountPrice) >= Number(price)) {
+        errs.discountPrice = 'Discount price must be lower than the regular price';
+      }
+    }
+
+    if (deliveryFee !== '' && (isNaN(Number(deliveryFee)) || Number(deliveryFee) < 0)) {
+      errs.deliveryFee = 'Delivery fee in KES cannot be negative';
+    }
+
     if (stock === '' || Number(stock) < 0) errs.stock = 'Stock quantity cannot be negative';
     if (images.length === 0) errs.images = 'At least one photo is required';
     if (!sellerPhone.trim()) errs.sellerPhone = 'Seller phone is required';
@@ -251,7 +266,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -267,9 +282,9 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
       }
     });
 
-    setTimeout(() => {
+    try {
       if (editProduct) {
-        updateProduct(editProduct.id, {
+        await updateProduct(editProduct.id, {
           title,
           category,
           condition,
@@ -293,7 +308,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
         setIsSubmitting(false);
         onSuccess(editProduct);
       } else {
-        const created = addProduct({
+        const created = await addProduct({
           title,
           category,
           condition,
@@ -321,7 +336,10 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
         setIsSubmitting(false);
         onSuccess(created);
       }
-    }, 1000);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save product', 'error');
+      setIsSubmitting(false);
+    }
   };
 
   // Preview synthetic product object for live preview card
@@ -506,7 +524,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Regular Price ($) <span className="text-rose-500">*</span>
+                  Regular Price (KSh) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -515,14 +533,14 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
                   required
                   value={price}
                   onChange={(e) => setPrice(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 450"
+                  placeholder="e.g. 5,500"
                   className="w-full p-3 rounded-2xl border border-slate-200 text-slate-900 font-bold outline-none focus:border-indigo-500"
                 />
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Discounted Offer Price ($) (Optional)
+                  Discounted Offer Price (KSh) (Optional)
                 </label>
                 <input
                   type="number"
@@ -530,7 +548,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
                   step="0.01"
                   value={discountPrice}
                   onChange={(e) => setDiscountPrice(e.target.value ? Number(e.target.value) : '')}
-                  placeholder="e.g. 399"
+                  placeholder="e.g. 4,999"
                   className="w-full p-3 rounded-2xl border border-slate-200 text-slate-900 font-bold outline-none focus:border-indigo-500"
                 />
               </div>
@@ -832,6 +850,19 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 font-semibold"
                 />
               </div>
+
+              <div className="sm:col-span-2">
+                <label className="block font-bold text-slate-700 mb-1">Estimated Delivery Fee (KSh)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={deliveryFee}
+                  onChange={(e) => setDeliveryFee(e.target.value ? Number(e.target.value) : '')}
+                  placeholder="e.g. 500 (or 0 for Free Delivery)"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-slate-900 font-bold"
+                />
+              </div>
             </div>
 
             {/* Delivery Checkboxes */}
@@ -931,7 +962,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
                     <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-current" />
                     <span>Featured Sponsored</span>
                   </span>
-                  <span className="text-indigo-600 font-extrabold">$5.00</span>
+                  <span className="text-indigo-600 font-extrabold">KSh 650.00</span>
                 </div>
                 <p className="text-slate-600 text-[11px]">
                   Promoted top slot on homepage, category priority, and gold Featured badge.

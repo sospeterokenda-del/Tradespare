@@ -55,13 +55,13 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     (initialTab as any) || 'orders'
   );
 
-  // Filter orders made by this buyer
+  // Filter orders made by this buyer (or all if admin)
   const myOrders = orders.filter(
-    (o) => o.buyerId === currentUser.id || o.buyerEmail === currentUser.email
+    (o) => currentUser.role === 'admin' || o.buyerId === currentUser.id || o.buyerEmail === currentUser.email
   );
 
   // Inquiries sent by this buyer
-  const myInquiries = inquiries.filter((i) => i.buyerId === currentUser.id);
+  const myInquiries = inquiries.filter((i) => currentUser.role === 'admin' || i.buyerId === currentUser.id);
   const [selectedInquiryId, setSelectedInquiryId] = useState<string>(myInquiries[0]?.id || '');
   const [replyText, setReplyText] = useState('');
 

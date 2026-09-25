@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import {
   Archive,
+  Banknote,
   BarChart3,
   CheckCircle2,
   Clock,
-  DollarSign,
   Edit,
   Eye,
   Layers,
@@ -61,7 +61,12 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
 
   // Filter products for this seller/business
   const myBusiness = businesses.find((b) => b.ownerId === currentUser.id || b.id === currentUser.businessId) || businesses[0];
-  const myProducts = products.filter((p) => p.businessId === myBusiness?.id || p.sellerId === currentUser.id);
+  const myProducts = products.filter(
+    (p) => currentUser.role === 'admin' || p.sellerId === currentUser.id || (myBusiness && p.businessId === myBusiness.id)
+  );
+
+  const isPending = currentUser.role === 'seller' && currentUser.status === 'pending';
+  const isSuspended = currentUser.status === 'suspended';
 
   // Status filter for products table
   const [productSearch, setProductSearch] = useState('');
@@ -179,22 +184,73 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => onNavigate('post-product')}
-            className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 min-h-[44px]"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Post New Product</span>
-          </button>
+          {isPending ? (
+            <div className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-bold flex items-center justify-center gap-2">
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>Pending Admin Approval</span>
+            </div>
+          ) : isSuspended ? (
+            <div className="w-full sm:w-auto px-4 py-2.5 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-200 text-xs font-bold flex items-center justify-center gap-2">
+              <span>Account Suspended</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => onNavigate('post-product')}
+              className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition active:scale-95 min-h-[44px]"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Post New Product</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Pending Account Notice Banner */}
+      {isPending && (
+        <div className="bg-amber-50 border border-amber-300 rounded-3xl p-5 flex items-start gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-800 flex-shrink-0 mt-0.5">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-extrabold text-sm text-amber-900">
+                Seller Account Pending Administrator Approval
+              </h3>
+              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                Pending Verification
+              </span>
+            </div>
+            <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+              Your merchant profile has been submitted and is currently in the moderation review queue.
+              In accordance with platform security policies, you cannot post new products or edit catalog inventory until an administrator verifies and activates your seller account.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Suspended Notice Banner */}
+      {isSuspended && (
+        <div className="bg-rose-50 border border-rose-300 rounded-3xl p-5 flex items-start gap-3.5 shadow-2xs">
+          <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-800 flex-shrink-0 mt-0.5">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-extrabold text-sm text-rose-900">
+              Account Suspended by Operations Governance
+            </h3>
+            <p className="text-xs text-rose-800 mt-1 leading-relaxed">
+              Product creation and order fulfillment permissions have been suspended. Please contact operations support to resolve any compliance issues.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-xs space-y-2">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>Total Sales GMV</span>
-            <DollarSign className="w-4 h-4 text-emerald-600" />
+            <Banknote className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-xl sm:text-2xl font-black text-slate-900">{formatPrice(totalRevenue)}</p>
           <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
@@ -683,7 +739,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                   <h4 className="font-bold text-base text-slate-900">Pro Merchant</h4>
                   <p className="text-xs text-slate-500 mt-1">For growing commercial businesses</p>
                   <p className="text-3xl font-black text-indigo-600 mt-4">
-                    $19 <span className="text-xs text-slate-400 font-normal">/ month</span>
+                    KSh 2,500.00 <span className="text-xs text-slate-400 font-normal">/ month</span>
                   </p>
                   <ul className="space-y-2 text-xs text-slate-600 mt-4">
                     <li>✓ Unlimited active product listings</li>
@@ -707,7 +763,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
                   <h4 className="font-bold text-base text-slate-900">Enterprise Platinum</h4>
                   <p className="text-xs text-slate-500 mt-1">For large manufacturers & import franchises</p>
                   <p className="text-3xl font-black text-slate-900 mt-4">
-                    $49 <span className="text-xs text-slate-400 font-normal">/ month</span>
+                    KSh 6,500.00 <span className="text-xs text-slate-400 font-normal">/ month</span>
                   </p>
                   <ul className="space-y-2 text-xs text-slate-600 mt-4">
                     <li>✓ All Pro Merchant perks</li>

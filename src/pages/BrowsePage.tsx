@@ -311,18 +311,20 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({
 
           {/* Price Range */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-900 block">Price Range ($)</label>
+            <label className="text-xs font-bold text-slate-900 block">Price Range (KSh)</label>
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
-                placeholder="Min"
+                min="0"
+                placeholder="Min (KSh)"
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : '')}
                 className="w-full p-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-indigo-500 bg-slate-50"
               />
               <input
                 type="number"
-                placeholder="Max"
+                min="0"
+                placeholder="Max (KSh)"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : '')}
                 className="w-full p-2 rounded-xl border border-slate-200 text-xs outline-none focus:border-indigo-500 bg-slate-50"
@@ -529,18 +531,20 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({
 
               {/* Price Range */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-900 block">Price Range</label>
+                <label className="text-xs font-bold text-slate-900 block">Price Range (KSh)</label>
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="number"
-                    placeholder="Min"
+                    min="0"
+                    placeholder="Min (KSh)"
                     value={minPrice}
                     onChange={(e) => setMinPrice(e.target.value ? Number(e.target.value) : '')}
                     className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-500 bg-slate-50 min-h-[44px]"
                   />
                   <input
                     type="number"
-                    placeholder="Max"
+                    min="0"
+                    placeholder="Max (KSh)"
                     value={maxPrice}
                     onChange={(e) => setMaxPrice(e.target.value ? Number(e.target.value) : '')}
                     className="w-full p-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-indigo-500 bg-slate-50 min-h-[44px]"

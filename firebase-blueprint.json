@@ -1,0 +1,259 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered user profile with role-based access control and account status.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User identifier matching auth UID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the user",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user",
+          "maxLength": 150
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone contact number",
+          "maxLength": 30
+        },
+        "role": {
+          "type": "string",
+          "description": "RBAC role of the user",
+          "enum": ["admin", "seller", "buyer"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Account status determined by administrative governance",
+          "enum": ["pending", "active", "suspended", "rejected"]
+        },
+        "avatar": {
+          "type": "string",
+          "description": "URL to profile avatar image",
+          "maxLength": 500
+        },
+        "businessName": {
+          "type": "string",
+          "description": "Registered store or merchant trade name",
+          "maxLength": 120
+        },
+        "location": {
+          "type": "string",
+          "description": "Geographical operational city or region",
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of account creation",
+          "maxLength": 50
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last account update",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "name", "email", "role", "status", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Explicit role authorization record verifying administrative privileges.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Admin Firebase UID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Admin verified email",
+          "maxLength": 150
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when admin role was designated",
+          "maxLength": 50
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Marketplace item published by an approved seller or managed by an admin.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique product listing ID",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the item or merchandise",
+          "maxLength": 150
+        },
+        "slug": {
+          "type": "string",
+          "description": "URL slug",
+          "maxLength": 180
+        },
+        "category": {
+          "type": "string",
+          "description": "Industry or merchandise category",
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the product",
+          "maxLength": 5000
+        },
+        "price": {
+          "type": "number",
+          "description": "Price in base currency USD"
+        },
+        "discountPrice": {
+          "type": "number",
+          "description": "Optional discounted promotional price"
+        },
+        "condition": {
+          "type": "string",
+          "description": "Physical condition of item",
+          "enum": ["new", "refurbished", "used"]
+        },
+        "stock": {
+          "type": "number",
+          "description": "Available stock inventory count"
+        },
+        "location": {
+          "type": "string",
+          "description": "Location description",
+          "maxLength": 100
+        },
+        "city": {
+          "type": "string",
+          "description": "City of item dispatch",
+          "maxLength": 60
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "UID of the publishing seller",
+          "maxLength": 128
+        },
+        "businessName": {
+          "type": "string",
+          "description": "Merchant or seller display name",
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "description": "Publication moderation state",
+          "enum": ["active", "pending", "draft", "archived", "rejected"]
+        },
+        "featured": {
+          "type": "boolean",
+          "description": "Whether product is highlighted on homepage"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of listing creation",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "title", "category", "price", "stock", "sellerId", "status", "createdAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Transactional purchase order made by an approved buyer.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order identifier",
+          "maxLength": 128
+        },
+        "orderNumber": {
+          "type": "string",
+          "description": "Human readable order confirmation code",
+          "maxLength": 50
+        },
+        "buyerId": {
+          "type": "string",
+          "description": "UID of the customer who placed the order",
+          "maxLength": 128
+        },
+        "buyerName": {
+          "type": "string",
+          "description": "Customer recipient name",
+          "maxLength": 100
+        },
+        "buyerEmail": {
+          "type": "string",
+          "description": "Customer contact email",
+          "maxLength": 150
+        },
+        "buyerPhone": {
+          "type": "string",
+          "description": "Customer contact telephone",
+          "maxLength": 30
+        },
+        "buyerAddress": {
+          "type": "string",
+          "description": "Delivery shipping destination",
+          "maxLength": 300
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Final total charged"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Selected payment method",
+          "maxLength": 50
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "Financial clearance status",
+          "enum": ["paid", "pending", "failed"]
+        },
+        "orderStatus": {
+          "type": "string",
+          "description": "Fulfillment lifecycle state",
+          "enum": ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of order placement",
+          "maxLength": 50
+        }
+      },
+      "required": ["id", "orderNumber", "buyerId", "totalAmount", "orderStatus", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles with role, approval status, and credentials"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Whitelisted administrator records for backend rule authorization"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Marketplace products managed by approved sellers or admins"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Purchase orders placed by customers and fulfilled by sellers"
+    }
+  }
+}

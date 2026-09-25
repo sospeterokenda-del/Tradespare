@@ -8,7 +8,7 @@ import {
   Building,
   CheckCircle2,
   Clock,
-  DollarSign,
+  Banknote,
   Edit,
   Eye,
   Flag,
@@ -22,8 +22,10 @@ import {
   Plus,
   Save,
   Search,
+  Shield,
   ShieldAlert,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Store,
   Trash2,
@@ -59,17 +61,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     verifySeller,
     formatPrice,
     showToast,
+    allUsers,
+    approveUser,
+    suspendUser,
+    activateUser,
+    rejectUser,
+    updateUserRole,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<
-    'stats' | 'moderation' | 'admin_details' | 'businesses' | 'announcements' | 'reports'
-  >('moderation');
+    'users_rbac' | 'moderation' | 'admin_details' | 'stats' | 'businesses' | 'announcements' | 'reports'
+  >('users_rbac');
 
   // Stats calculation
   const totalGMV = orders.reduce((sum, o) => sum + o.totalAmount, 0);
   const pendingProducts = products.filter((p) => p.status === 'pending');
   const activeProducts = products.filter((p) => p.status === 'active');
   const verifiedBizCount = businesses.filter((b) => b.verified).length;
+  const pendingUsers = allUsers.filter((u) => u.status === 'pending');
+  const activeUsers = allUsers.filter((u) => u.status === 'active');
+  const suspendedUsers = allUsers.filter((u) => u.status === 'suspended' || u.status === 'rejected');
+
+  // Users & RBAC management states
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'seller' | 'buyer' | 'admin'>('all');
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'pending' | 'active' | 'suspended' | 'rejected'>('all');
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [actionUserModal, setActionUserModal] = useState<{ user: User; action: 'suspend' | 'reject' } | null>(null);
+  const [userActionReason, setUserActionReason] = useState('Requires compliance review');
 
   // Search filter inside products moderation
   const [modFilter, setModFilter] = useState<'all' | 'pending' | 'active'>('pending');
@@ -211,34 +229,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* Global Pending Moderation Counter Badge */}
-        {pendingProducts.length > 0 && (
-          <div className="bg-amber-500/15 border border-amber-500/30 text-amber-300 p-3.5 sm:px-4 sm:py-3 rounded-2xl flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="font-bold text-xs">{pendingProducts.length} Pending Listings</p>
-                <p className="text-[10px] text-amber-200">Awaiting moderator validation</p>
+        {/* Global Pending Moderation Counter Badges */}
+        <div className="flex flex-wrap items-center gap-3">
+          {pendingUsers.length > 0 && (
+            <div className="bg-amber-500/20 border border-amber-500/40 text-amber-200 p-3 sm:px-4 sm:py-2.5 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-xs">{pendingUsers.length} Seller{pendingUsers.length > 1 ? 's' : ''} Pending</p>
+                  <p className="text-[10px] text-amber-300/80">Require admin approval</p>
+                </div>
               </div>
+              <button
+                onClick={() => {
+                  setActiveTab('users_rbac');
+                  setUserStatusFilter('pending');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 min-h-[36px] flex items-center"
+              >
+                Approve
+              </button>
             </div>
-            <button
-              onClick={() => {
-                setActiveTab('moderation');
-                setModFilter('pending');
-              }}
-              className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400 min-h-[40px] flex items-center"
-            >
-              Review
-            </button>
-          </div>
-        )}
+          )}
+
+          {pendingProducts.length > 0 && (
+            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-300 p-3 sm:px-4 sm:py-2.5 rounded-2xl flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-xs">{pendingProducts.length} Pending Listings</p>
+                  <p className="text-[10px] text-amber-200">Awaiting moderator validation</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTab('moderation');
+                  setModFilter('pending');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400 min-h-[36px] flex items-center"
+              >
+                Review
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs navigation */}
       <div className="space-y-6">
         <div className="flex border-b border-slate-200 gap-2 sm:gap-6 overflow-x-auto text-xs sm:text-sm font-bold no-scrollbar">
           {[
-            { id: 'moderation', label: `Moderation (${pendingProducts.length})` },
+            {
+              id: 'users_rbac',
+              label: `Users & RBAC (${pendingUsers.length > 0 ? `${pendingUsers.length} Pending` : allUsers.length})`,
+            },
+            { id: 'moderation', label: `Listings Moderation (${pendingProducts.length})` },
             { id: 'admin_details', label: 'Admin Details & Branding' },
             { id: 'stats', label: 'Financials & KPIs' },
             { id: 'businesses', label: `Businesses (${businesses.length})` },
@@ -258,6 +303,309 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </button>
           ))}
         </div>
+
+        {/* Tab 0: USERS & RBAC GOVERNANCE (Admin Approval, Activation, Suspension, Rejection) */}
+        {activeTab === 'users_rbac' && (
+          <div className="space-y-5 animate-in fade-in duration-150">
+            {/* KPI Metric Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Total Accounts</span>
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
+                    <Users className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-slate-900">{allUsers.length}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Persisted in database</p>
+              </div>
+
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Pending Approvals</span>
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                    pendingUsers.length > 0 ? 'bg-amber-100 text-amber-700 animate-pulse' : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    <Clock className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-amber-600">{pendingUsers.length}</p>
+                <p className="text-[11px] text-amber-700 font-medium mt-0.5">
+                  {pendingUsers.length > 0 ? 'Action required by Admin' : 'Queue clear'}
+                </p>
+              </div>
+
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Active Verified</span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                    <CheckCircle2 className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-emerald-600">{activeUsers.length}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Full marketplace rights</p>
+              </div>
+
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Suspended / Rejected</span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-rose-700">
+                    <ShieldAlert className="w-4 h-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-rose-600">{suspendedUsers.length}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Access restricted</p>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={(e) => setUserSearchQuery(e.target.value)}
+                    placeholder="Search users by name, email, or store name..."
+                    className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:border-indigo-500 outline-none"
+                  />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+
+                {/* Role Filter */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  <span className="text-xs font-bold text-slate-500 mr-1 hidden sm:inline">Role:</span>
+                  {(['all', 'seller', 'buyer', 'admin'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setUserRoleFilter(r)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition min-h-[34px] ${
+                        userRoleFilter === r
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {r === 'all' ? 'All Roles' : r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-500 mr-1 hidden sm:inline">Status:</span>
+                {(['all', 'pending', 'active', 'suspended', 'rejected'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setUserStatusFilter(s)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition min-h-[34px] ${
+                      userStatusFilter === s
+                        ? s === 'pending'
+                          ? 'bg-amber-500 text-slate-950 font-extrabold'
+                          : s === 'active'
+                          ? 'bg-emerald-600 text-white'
+                          : s === 'suspended'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {s === 'all' ? 'All Statuses' : s}
+                    {s === 'pending' && pendingUsers.length > 0 && ` (${pendingUsers.length})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* User List Table */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 uppercase font-black tracking-wider text-[10px]">
+                      <th className="py-3.5 px-4">User & Contact</th>
+                      <th className="py-3.5 px-4">Assigned Role</th>
+                      <th className="py-3.5 px-4">Governance Status</th>
+                      <th className="py-3.5 px-4">Storefront Info</th>
+                      <th className="py-3.5 px-4">Registered</th>
+                      <th className="py-3.5 px-4 text-right">Administrative Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {allUsers
+                      .filter((u) => {
+                        if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
+                        if (userStatusFilter !== 'all' && u.status !== userStatusFilter) return false;
+                        if (userSearchQuery.trim()) {
+                          const q = userSearchQuery.toLowerCase();
+                          const matchName = u.name.toLowerCase().includes(q);
+                          const matchEmail = u.email.toLowerCase().includes(q);
+                          const matchStore = (u.businessName || '').toLowerCase().includes(q);
+                          if (!matchName && !matchEmail && !matchStore) return false;
+                        }
+                        return true;
+                      })
+                      .map((u) => {
+                        return (
+                          <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                            {/* User & Contact */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex items-center gap-3">
+                                <img
+                                  src={u.avatar}
+                                  alt={u.name}
+                                  className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                                />
+                                <div className="overflow-hidden min-w-0">
+                                  <p className="font-bold text-slate-900 truncate">{u.name}</p>
+                                  <p className="text-[11px] text-slate-500 truncate">{u.email}</p>
+                                  <p className="text-[10px] text-slate-400 truncate">{u.phone}</p>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Assigned Role */}
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`inline-flex items-center gap-1 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                                  u.role === 'admin'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                    : u.role === 'seller'
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                }`}
+                              >
+                                {u.role === 'admin' && <Shield className="w-3 h-3 text-rose-600" />}
+                                {u.role === 'seller' && <Store className="w-3 h-3 text-emerald-600" />}
+                                {u.role === 'buyer' && <ShoppingBag className="w-3 h-3 text-indigo-600" />}
+                                {u.role}
+                              </span>
+                            </td>
+
+                            {/* Governance Status */}
+                            <td className="py-3.5 px-4">
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full w-fit ${
+                                    u.status === 'active'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : u.status === 'pending'
+                                      ? 'bg-amber-100 text-amber-800 font-extrabold animate-pulse'
+                                      : u.status === 'suspended'
+                                      ? 'bg-rose-100 text-rose-800'
+                                      : 'bg-slate-100 text-slate-700'
+                                  }`}
+                                >
+                                  {u.status === 'active' && <CheckCircle2 className="w-3 h-3" />}
+                                  {u.status === 'pending' && <Clock className="w-3 h-3" />}
+                                  {u.status === 'suspended' && <AlertTriangle className="w-3 h-3" />}
+                                  {u.status === 'rejected' && <XCircle className="w-3 h-3" />}
+                                  <span className="capitalize">{u.status}</span>
+                                </span>
+                                {u.rejectionReason && (
+                                  <p className="text-[10px] text-rose-600 max-w-xs truncate" title={u.rejectionReason}>
+                                    Note: {u.rejectionReason}
+                                  </p>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Storefront Info */}
+                            <td className="py-3.5 px-4">
+                              {u.businessName ? (
+                                <div>
+                                  <p className="font-semibold text-slate-800 truncate max-w-[150px]">{u.businessName}</p>
+                                  <p className="text-[10px] text-slate-400">{u.location || 'Kenya'}</p>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic text-[11px]">Individual account</span>
+                              )}
+                            </td>
+
+                            {/* Registered */}
+                            <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                              {new Date(u.createdAt).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </td>
+
+                            {/* Administrative Actions */}
+                            <td className="py-3.5 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                {/* If Pending Seller: Approve or Reject */}
+                                {u.status === 'pending' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => approveUser(u.id)}
+                                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition active:scale-95 min-h-[32px]"
+                                      title="Approve seller merchant account"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Approve</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActionUserModal({ user: u, action: 'reject' })}
+                                      className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-bold text-xs flex items-center gap-1 border border-slate-200 transition min-h-[32px]"
+                                      title="Reject application"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                      <span>Reject</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* If Active: Suspend */}
+                                {u.status === 'active' && u.role !== 'admin' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setActionUserModal({ user: u, action: 'suspend' })}
+                                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 font-bold text-xs flex items-center gap-1 border border-slate-200 transition min-h-[32px]"
+                                    title="Suspend account"
+                                  >
+                                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                                    <span>Suspend</span>
+                                  </button>
+                                )}
+
+                                {/* If Suspended or Rejected: Activate */}
+                                {(u.status === 'suspended' || u.status === 'rejected') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => activateUser(u.id)}
+                                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition active:scale-95 min-h-[32px]"
+                                    title="Restore account to active"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Activate</span>
+                                  </button>
+                                )}
+
+                                {/* Role dropdown changer for Admin */}
+                                <select
+                                  value={u.role}
+                                  onChange={(e) => updateUserRole(u.id, e.target.value as any)}
+                                  className="bg-slate-100 hover:bg-slate-200/80 text-[11px] font-bold text-slate-700 rounded-lg px-2 py-1 border border-slate-200 outline-none cursor-pointer"
+                                  title="Change user RBAC role"
+                                >
+                                  <option value="buyer">Buyer</option>
+                                  <option value="seller">Seller</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tab 1: Product Moderation */}
         {activeTab === 'moderation' && (
@@ -587,6 +935,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </div>
 
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Default Platform Currency</label>
+                  <div className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 flex items-center justify-between">
+                    <span>Kenyan Shilling (KES)</span>
+                    <span className="text-xs bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-md">
+                      KSh
+                    </span>
+                  </div>
+                </div>
+
                 <div className="sm:col-span-2">
                   <label className="block font-bold text-slate-700 mb-1">Registered Business Office Address</label>
                   <input
@@ -784,7 +1142,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         )}
       </div>
 
-      {/* Reject Modal */}
+      {/* Reject Listing Modal */}
       {rejectModalProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -814,6 +1172,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white"
               >
                 Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Governance Action Modal (Suspend or Reject User) */}
+      {actionUserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-700 flex-shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-slate-900 capitalize">
+                  {actionUserModal.action === 'suspend' ? 'Suspend User Account' : 'Reject Seller Registration'}
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Target: {actionUserModal.user.name} ({actionUserModal.user.email})
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Official Reason / Notes <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                required
+                value={userActionReason}
+                onChange={(e) => setUserActionReason(e.target.value)}
+                placeholder="Specify compliance or verification reason..."
+                className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-900 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setActionUserModal(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (actionUserModal.action === 'suspend') {
+                    await suspendUser(actionUserModal.user.id, userActionReason);
+                  } else {
+                    await rejectUser(actionUserModal.user.id, userActionReason);
+                  }
+                  setActionUserModal(null);
+                }}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
+              >
+                Confirm {actionUserModal.action === 'suspend' ? 'Suspension' : 'Rejection'}
               </button>
             </div>
           </div>

@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { AccessDenied } from './components/AccessDenied';
+import { AuthModal } from './components/AuthModal';
 import { CartDrawer } from './components/CartDrawer';
 import { Footer } from './components/Footer';
 import { Navbar } from './components/Navbar';
@@ -16,7 +18,7 @@ import { SellerDashboard } from './pages/SellerDashboard';
 import { BusinessProfile, Product } from './types';
 
 function MainApp() {
-  const { products, businesses, clearCart } = useMarketplace();
+  const { products, businesses, clearCart, currentUser } = useMarketplace();
 
   // Navigation state
   const [currentView, setCurrentView] = useState<string>('home');
@@ -31,6 +33,10 @@ function MainApp() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [quickOrderProduct, setQuickOrderProduct] = useState<Product | null>(null);
+
+  // Authentication & RBAC Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authExplanation, setAuthExplanation] = useState<string | undefined>(undefined);
 
   // Search & Filter bridge state
   const [searchQuery, setSearchQuery] = useState('');
@@ -81,6 +87,14 @@ function MainApp() {
     setSearchQuery(query);
   };
 
+  // RBAC Helper Checks
+  const isGuest = currentUser.id === 'usr_guest';
+  const isAdmin = currentUser.role === 'admin';
+  const isSeller = currentUser.role === 'seller';
+  const isApprovedSeller = isSeller && currentUser.status === 'active';
+  const isPendingSeller = isSeller && currentUser.status === 'pending';
+  const isSuspended = currentUser.status === 'suspended';
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60 font-sans text-slate-900 selection:bg-indigo-500 selection:text-white overflow-x-hidden w-full relative">
       {/* Toast Notification Layer */}
@@ -91,6 +105,10 @@ function MainApp() {
         currentView={currentView}
         onNavigate={handleNavigate}
         onOpenCart={() => setIsCartOpen(true)}
+        onOpenAuth={() => {
+          setAuthExplanation(undefined);
+          setIsAuthModalOpen(true);
+        }}
         searchQuery={searchQuery}
         onSearchChange={handleSearchChange}
         selectedCategory={selectedCategory}
@@ -99,8 +117,9 @@ function MainApp() {
         onLocationSelect={handleLocationSelect}
       />
 
-      {/* Main Content Router */}
+      {/* Main Content Router with RBAC Route Guards */}
       <main className="flex-1 overflow-x-hidden w-full">
+        {/* Home Page */}
         {currentView === 'home' && (
           <HomePage
             onNavigate={handleNavigate}
@@ -112,6 +131,7 @@ function MainApp() {
           />
         )}
 
+        {/* Public Catalog Browse */}
         {currentView === 'browse' && (
           <BrowsePage
             initialCategory={selectedCategory}
@@ -122,6 +142,7 @@ function MainApp() {
           />
         )}
 
+        {/* Product Detail Page */}
         {currentView === 'product-detail' && selectedProduct && (
           <ProductDetailPage
             product={selectedProduct}
@@ -129,9 +150,11 @@ function MainApp() {
             onSelectProduct={handleSelectProduct}
             onSelectBusiness={handleSelectBusiness}
             onNavigate={handleNavigate}
+            onEditProduct={handleEditProduct}
           />
         )}
 
+        {/* Business Storefront Profile */}
         {currentView === 'business-profile' && selectedBusiness && (
           <BusinessProfilePage
             business={selectedBusiness}
@@ -142,42 +165,148 @@ function MainApp() {
           />
         )}
 
+        {/* Post / Edit Product (PROTECTED: Approved Sellers & Admins Only) */}
         {currentView === 'post-product' && (
-          <PostProductPage
-            editProduct={editingProduct}
-            onBack={() => {
-              setEditingProduct(undefined);
-              handleNavigate('seller-dashboard');
-            }}
-            onSuccess={(product) => {
-              setEditingProduct(undefined);
-              handleSelectProduct(product);
-            }}
-          />
+          isGuest ? (
+            <AccessDenied
+              reason="not_authenticated"
+              requiredRole="seller"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('Sign in as an approved Seller or Admin to publish products.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : isSuspended ? (
+            <AccessDenied
+              reason="account_suspended"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          ) : (!isAdmin && !isSeller) ? (
+            <AccessDenied
+              reason="role_restricted"
+              requiredRole="seller"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('You are signed in as a Buyer. Switch or register as a Seller to publish products.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : isPendingSeller ? (
+            <AccessDenied
+              reason="seller_pending"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          ) : editingProduct && editingProduct.sellerId !== currentUser.id && !isAdmin ? (
+            <AccessDenied
+              reason="not_owner"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          ) : (
+            <PostProductPage
+              editProduct={editingProduct}
+              onBack={() => {
+                setEditingProduct(undefined);
+                handleNavigate(isAdmin ? 'admin-dashboard' : 'seller-dashboard');
+              }}
+              onSuccess={(product) => {
+                setEditingProduct(undefined);
+                handleSelectProduct(product);
+              }}
+            />
+          )
         )}
 
+        {/* Seller Dashboard (PROTECTED: Sellers & Admins Only) */}
         {currentView === 'seller-dashboard' && (
-          <SellerDashboard
-            onNavigate={handleNavigate}
-            onEditProduct={handleEditProduct}
-            initialTab={viewParams.tab || 'products'}
-          />
+          isGuest ? (
+            <AccessDenied
+              reason="not_authenticated"
+              requiredRole="seller"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('Sign in to access your Seller Merchant Dashboard.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : isSuspended ? (
+            <AccessDenied
+              reason="account_suspended"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          ) : (!isAdmin && !isSeller) ? (
+            <AccessDenied
+              reason="role_restricted"
+              requiredRole="seller"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('You are signed in as a Buyer. The Seller Merchant Hub is restricted to Sellers and Admins.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : (
+            <SellerDashboard
+              onNavigate={handleNavigate}
+              onEditProduct={handleEditProduct}
+              initialTab={viewParams.tab || 'products'}
+            />
+          )
         )}
 
+        {/* Customer Dashboard (PROTECTED: Authenticated Customers, Sellers & Admins) */}
         {currentView === 'customer-dashboard' && (
-          <CustomerDashboard
-            onNavigate={handleNavigate}
-            onSelectProduct={handleSelectProduct}
-            onQuickOrder={handleQuickOrder}
-            initialTab={viewParams.tab || 'orders'}
-          />
+          isGuest ? (
+            <AccessDenied
+              reason="not_authenticated"
+              requiredRole="buyer"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('Sign in to view your orders, saved searches, and wishlist.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : (
+            <CustomerDashboard
+              onNavigate={handleNavigate}
+              onSelectProduct={handleSelectProduct}
+              onQuickOrder={handleQuickOrder}
+              initialTab={viewParams.tab || 'orders'}
+            />
+          )
         )}
 
+        {/* Admin Dashboard (STRICTLY PROTECTED: Administrator Only) */}
         {currentView === 'admin-dashboard' && (
-          <AdminDashboard
-            onNavigate={handleNavigate}
-            onSelectProduct={handleSelectProduct}
-          />
+          isGuest ? (
+            <AccessDenied
+              reason="not_authenticated"
+              requiredRole="admin"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('Platform Governance Center requires Administrator credentials.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : !isAdmin ? (
+            <AccessDenied
+              reason="role_restricted"
+              requiredRole="admin"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => {
+                setAuthExplanation('Clearance denied: Administrator privileges required.');
+                setIsAuthModalOpen(true);
+              }}
+            />
+          ) : (
+            <AdminDashboard
+              onNavigate={handleNavigate}
+              onSelectProduct={handleSelectProduct}
+            />
+          )
         )}
       </main>
 
@@ -188,7 +317,14 @@ function MainApp() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        onCheckout={() => setIsCheckoutModalOpen(true)}
+        onCheckout={() => {
+          if (isGuest) {
+            setAuthExplanation('Please sign in or register to place your order securely.');
+            setIsAuthModalOpen(true);
+          } else {
+            setIsCheckoutModalOpen(true);
+          }
+        }}
         onSelectProduct={handleSelectProduct}
       />
 
@@ -215,6 +351,13 @@ function MainApp() {
           }}
         />
       )}
+
+      {/* Authentication & Role Selection Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        explanationMessage={authExplanation}
+      />
     </div>
   );
 }

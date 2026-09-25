@@ -37,6 +37,7 @@ interface ProductDetailPageProps {
   onSelectProduct: (product: Product) => void;
   onSelectBusiness: (business: BusinessProfile) => void;
   onNavigate: (view: string, params?: any) => void;
+  onEditProduct?: (product: Product) => void;
 }
 
 export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
@@ -45,10 +46,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onSelectProduct,
   onSelectBusiness,
   onNavigate,
+  onEditProduct,
 }) => {
   const {
     products,
     businesses,
+    currentUser,
     isInWishlist,
     toggleWishlist,
     addToCart,
@@ -320,6 +323,32 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Owner / Admin Action Bar (RBAC Enforced) */}
+          {(currentUser.role === 'admin' || (currentUser.role === 'seller' && currentUser.id === product.sellerId)) && (
+            <div className="p-4 rounded-3xl bg-indigo-50/80 border border-indigo-200 flex items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-bold text-indigo-950">
+                    {currentUser.role === 'admin' ? 'Administrator Controls' : 'You own this listing'}
+                  </p>
+                  <p className="text-[11px] text-indigo-700">
+                    {currentUser.role === 'admin' ? 'Admin has full edit & moderation privileges' : 'Merchant Storefront Owner'}
+                  </p>
+                </div>
+              </div>
+              {onEditProduct && (
+                <button
+                  type="button"
+                  onClick={() => onEditProduct(product)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1.5"
+                >
+                  <span>Edit Product</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Direct Seller Contact Buttons (WhatsApp, Message, Call) */}
           <div className="p-3.5 sm:p-4 rounded-3xl bg-emerald-50/50 border border-emerald-200/80 space-y-3">

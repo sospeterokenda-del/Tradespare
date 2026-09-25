@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
   AlertCircle,
+  Banknote,
   Building2,
   CheckCircle2,
   CreditCard,
-  DollarSign,
   Loader2,
   MapPin,
   Phone,
@@ -70,6 +70,16 @@ export const OrderModal: React.FC<OrderModalProps> = ({
 
     if (!buyerName || !buyerPhone || !buyerAddress) {
       setErrorMessage('Please fill in all delivery details');
+      return;
+    }
+
+    if (total <= 0 || isNaN(total)) {
+      setErrorMessage('Invalid order total amount in KES.');
+      return;
+    }
+
+    if (paymentMethod === 'mpesa' && (!mpesaPhone || mpesaPhone.trim().length < 9)) {
+      setErrorMessage('Please enter a valid Safaricom M-Pesa phone number (e.g. 0712345678 or +254712345678).');
       return;
     }
 
@@ -317,7 +327,7 @@ export const OrderModal: React.FC<OrderModalProps> = ({
                     : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                <DollarSign className="w-5 h-5 text-amber-600" />
+                <Banknote className="w-5 h-5 text-amber-600" />
                 <span className="text-xs font-bold">Pay on Delivery</span>
               </button>
             </div>
