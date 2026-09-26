@@ -14,7 +14,7 @@ import {
 import { useMarketplace } from '../context/MarketplaceContext';
 
 interface AccessDeniedProps {
-  reason: 'not_authenticated' | 'role_restricted' | 'seller_pending' | 'account_suspended' | 'not_owner';
+  reason: 'not_authenticated' | 'role_restricted' | 'seller_pending' | 'account_suspended' | 'account_rejected' | 'not_owner';
   requiredRole?: string;
   onNavigate: (view: string, params?: any) => void;
   onOpenAuth?: () => void;
@@ -54,6 +54,15 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
     icon = <AlertTriangle className="w-12 h-12 text-rose-600" />;
     badgeColor = 'bg-rose-100 text-rose-800 border-rose-300';
     badgeText = 'Account Suspended';
+  } else if (reason === 'account_rejected') {
+    title = 'Account Registration Rejected';
+    message =
+      currentUser.rejectionReason
+        ? `Your registration application was reviewed and rejected by an administrator. Reason: "${currentUser.rejectionReason}". Please contact support to submit revised documentation.`
+        : 'Your account registration was rejected during administrative compliance review. Please contact support.';
+    icon = <ShieldAlert className="w-12 h-12 text-rose-600" />;
+    badgeColor = 'bg-rose-100 text-rose-800 border-rose-300';
+    badgeText = 'Application Rejected';
   } else if (reason === 'role_restricted') {
     title = 'Unauthorized Access';
     message = `This page requires ${requiredRole ? requiredRole.toUpperCase() : 'elevated'} clearance. Your current role is "${currentUser.role.toUpperCase()}". Buyers cannot access seller or administrative management features.`;

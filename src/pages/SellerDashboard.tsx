@@ -24,6 +24,7 @@ import {
   Users,
   X,
   Zap,
+  LogOut,
 } from 'lucide-react';
 import { useMarketplace } from '../context/MarketplaceContext';
 import { BusinessProfile, Order, OrderStatus, Product, ProductStatus } from '../types';
@@ -53,6 +54,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
     sendInquiryMessage,
     updateBusinessProfile,
     showToast,
+    signOutUser,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'inquiries' | 'analytics' | 'subscriptions' | 'profile'>(
@@ -202,6 +204,18 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
               <span>Post New Product</span>
             </button>
           )}
+
+          <button
+            onClick={() => {
+              signOutUser();
+              onNavigate('home');
+            }}
+            className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10 min-h-[44px]"
+            title="Sign out of seller session"
+          >
+            <LogOut className="w-4 h-4 text-rose-400" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
 

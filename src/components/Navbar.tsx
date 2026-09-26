@@ -325,27 +325,43 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* If Guest: Sign In Button */}
             {isGuest ? (
-              <button
-                onClick={onOpenAuth}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95 min-h-[40px]"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>Sign In / Register</span>
-              </button>
-            ) : (
-              /* User Profile Avatar / Menu (Desktop) */
-              <div className="relative hidden md:block">
+              <div className="hidden sm:flex items-center gap-1.5">
                 <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center gap-2 p-1 pl-1.5 rounded-2xl hover:bg-slate-100 transition border border-slate-200 min-h-[40px]"
+                  onClick={() => onNavigate('login')}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition active:scale-95 min-h-[40px]"
                 >
-                  <img
-                    src={currentUser.avatar}
-                    alt={currentUser.name}
-                    className="w-8 h-8 rounded-full object-cover border border-slate-300"
-                  />
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-600 mr-1" />
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Sign In</span>
                 </button>
+              </div>
+            ) : (
+              /* User Profile Avatar & Menu (Desktop) */
+              <div className="hidden md:flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    signOutUser();
+                    onNavigate('home');
+                  }}
+                  className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition active:scale-95 min-h-[38px]"
+                  title="Sign out of account"
+                  aria-label="Logout"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Logout</span>
+                </button>
+
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center gap-2 p-1 pl-1.5 rounded-2xl hover:bg-slate-100 transition border border-slate-200 min-h-[40px]"
+                  >
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name}
+                      className="w-8 h-8 rounded-full object-cover border border-slate-300"
+                    />
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-600 mr-1" />
+                  </button>
 
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
@@ -450,6 +466,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   </div>
                 )}
+                </div>
               </div>
             )}
 
@@ -682,29 +699,41 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Role Switching & Account Management Modal Trigger */}
           <div className="pt-2 border-t border-slate-100 space-y-2">
+            {isGuest ? (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  onNavigate('login');
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition min-h-[48px]"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Password Login / Register</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  signOutUser();
+                  onNavigate('home');
+                }}
+                className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition min-h-[48px]"
+              >
+                <LogOut className="w-4 h-4 text-rose-600" />
+                <span>Sign Out Securely</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 onOpenAuth();
               }}
-              className="w-full py-3 px-3 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 flex items-center justify-center gap-2 transition min-h-[44px]"
+              className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200 flex items-center justify-center gap-2 transition"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 text-indigo-600" />
               <span>Switch Identity / Test RBAC Roles</span>
             </button>
-
-            {!isGuest && (
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  signOutUser();
-                }}
-                className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-2 transition"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            )}
           </div>
         </div>
       )}

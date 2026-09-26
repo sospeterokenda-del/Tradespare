@@ -12,6 +12,7 @@ import { BrowsePage } from './pages/BrowsePage';
 import { BusinessProfilePage } from './pages/BusinessProfilePage';
 import { CustomerDashboard } from './pages/CustomerDashboard';
 import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
 import { PostProductPage } from './pages/PostProductPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
 import { SellerDashboard } from './pages/SellerDashboard';
@@ -94,6 +95,7 @@ function MainApp() {
   const isApprovedSeller = isSeller && currentUser.status === 'active';
   const isPendingSeller = isSeller && currentUser.status === 'pending';
   const isSuspended = currentUser.status === 'suspended';
+  const isRejected = currentUser.status === 'rejected';
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60 font-sans text-slate-900 selection:bg-indigo-500 selection:text-white overflow-x-hidden w-full relative">
@@ -128,6 +130,30 @@ function MainApp() {
             onQuickOrder={handleQuickOrder}
             onCategorySelect={handleCategorySelect}
             onSearchChange={handleSearchChange}
+          />
+        )}
+
+        {/* Dedicated Password Login View */}
+        {currentView === 'login' && (
+          <LoginPage
+            onNavigate={handleNavigate}
+            initialTab="login"
+          />
+        )}
+
+        {/* Dedicated Password Recovery View */}
+        {currentView === 'forgot-password' && (
+          <LoginPage
+            onNavigate={handleNavigate}
+            initialTab="recovery"
+          />
+        )}
+
+        {/* Dedicated Account Registration View */}
+        {currentView === 'register' && (
+          <LoginPage
+            onNavigate={handleNavigate}
+            initialTab="register"
           />
         )}
 
@@ -183,6 +209,12 @@ function MainApp() {
               onNavigate={handleNavigate}
               onOpenAuth={() => setIsAuthModalOpen(true)}
             />
+          ) : isRejected ? (
+            <AccessDenied
+              reason="account_rejected"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
           ) : (!isAdmin && !isSeller) ? (
             <AccessDenied
               reason="role_restricted"
@@ -235,6 +267,12 @@ function MainApp() {
           ) : isSuspended ? (
             <AccessDenied
               reason="account_suspended"
+              onNavigate={handleNavigate}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
+            />
+          ) : isRejected ? (
+            <AccessDenied
+              reason="account_rejected"
               onNavigate={handleNavigate}
               onOpenAuth={() => setIsAuthModalOpen(true)}
             />
@@ -357,6 +395,15 @@ function MainApp() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         explanationMessage={authExplanation}
+        onSuccessfulLogin={(user) => {
+          if (user.role === 'admin') {
+            handleNavigate('admin-dashboard');
+          } else if (user.role === 'seller') {
+            handleNavigate('seller-dashboard');
+          } else {
+            handleNavigate('customer-dashboard');
+          }
+        }}
       />
     </div>
   );

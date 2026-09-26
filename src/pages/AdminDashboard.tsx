@@ -35,6 +35,7 @@ import {
   Users,
   X,
   XCircle,
+  LogOut,
 } from 'lucide-react';
 import { useMarketplace } from '../context/MarketplaceContext';
 import { AdminDetails, Product, User } from '../types';
@@ -67,6 +68,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     activateUser,
     rejectUser,
     updateUserRole,
+    signOutUser,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<
@@ -272,6 +274,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
           )}
+
+          <button
+            onClick={() => {
+              signOutUser();
+              onNavigate('home');
+            }}
+            className="px-4 py-2.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded-2xl text-xs font-bold transition flex items-center gap-2 border border-rose-500/50 shadow-xs min-h-[40px]"
+            title="Sign out of admin session"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
 

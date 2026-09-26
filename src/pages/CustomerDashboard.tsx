@@ -18,6 +18,7 @@ import {
   Truck,
   Upload,
   User,
+  LogOut,
 } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
 import { useMarketplace } from '../context/MarketplaceContext';
@@ -49,6 +50,7 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     formatPrice,
     recentlyViewed,
     showToast,
+    signOutUser,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'wishlist' | 'recent' | 'saved_searches' | 'messages'>(
@@ -150,6 +152,17 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           >
             <ShoppingBag className="w-4 h-4" />
             <span>Browse Products</span>
+          </button>
+          <button
+            onClick={() => {
+              signOutUser();
+              onNavigate('home');
+            }}
+            className="w-full sm:w-auto px-4 py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition min-h-[44px]"
+            title="Sign out of customer account"
+          >
+            <LogOut className="w-4 h-4 text-rose-600" />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>

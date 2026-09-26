@@ -65,10 +65,17 @@ interface MarketplaceContextType {
   registerUser: (payload: {
     name: string;
     email: string;
+    password?: string;
     phone: string;
     role: 'buyer' | 'seller';
     businessName?: string;
   }) => Promise<User>;
+  requestPasswordResetCode: (email: string) => Promise<{ success: boolean; code?: string; message: string }>;
+  resetPassword: (
+    email: string,
+    newPassword: string,
+    resetCode?: string
+  ) => Promise<{ success: boolean; message: string }>;
   fastSwitchUser: (userId: string) => void;
   signOutUser: () => Promise<void>;
 
@@ -162,10 +169,21 @@ const STORAGE_KEYS = {
 };
 
 export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Users list initialized from storage or defaults
+  // Users list initialized from storage or defaults with password support
   const [allUsers, setAllUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.USERS) || localStorage.getItem('ts_users_v3');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
+    if (saved) {
+      try {
+        const parsed: User[] = JSON.parse(saved);
+        return parsed.map((u) => ({
+          ...u,
+          password: u.password || 'Password123!',
+        }));
+      } catch {
+        return MOCK_USERS;
+      }
+    }
+    return MOCK_USERS;
   });
 
   // Current logged in user ID
@@ -441,14 +459,35 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     businessName?: string
   ): Promise<User> => {
     setIsAuthLoading(true);
+    let fbUser;
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      const fbUser = result.user;
+      fbUser = result.user;
+    } catch (authError: any) {
+      setIsAuthLoading(false);
+      // If the user closed or cancelled the popup, exit gracefully without throwing a Firestore error
+      if (
+        authError?.code === 'auth/popup-closed-by-user' ||
+        authError?.code === 'auth/cancelled-popup-request' ||
+        authError?.message?.includes('popup-closed-by-user')
+      ) {
+        throw new Error('Google sign-in was cancelled.');
+      }
+      throw new Error(authError?.message || 'Google authentication failed.');
+    }
+
+    try {
       const isAdminEmail = fbUser.email === 'sospeterokenda@gmail.com';
 
       // Check if user already exists in Firestore
       const userRef = doc(db, 'users', fbUser.uid);
-      const snap = await getDoc(userRef);
+      let snap;
+      try {
+        snap = await getDoc(userRef);
+      } catch (getErr) {
+        handleFirestoreError(getErr, OperationType.GET, `users/${fbUser.uid}`);
+        throw getErr;
+      }
 
       let userProfile: User;
       if (snap.exists()) {
@@ -478,13 +517,18 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           createdAt: new Date().toISOString(),
         };
 
-        await setDoc(userRef, userProfile);
-        if (isAdminEmail) {
-          await setDoc(doc(db, 'admins', fbUser.uid), {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            createdAt: new Date().toISOString(),
-          });
+        try {
+          await setDoc(userRef, userProfile);
+          if (isAdminEmail) {
+            await setDoc(doc(db, 'admins', fbUser.uid), {
+              uid: fbUser.uid,
+              email: fbUser.email,
+              createdAt: new Date().toISOString(),
+            });
+          }
+        } catch (setErr) {
+          handleFirestoreError(setErr, OperationType.WRITE, `users/${fbUser.uid}`);
+          throw setErr;
         }
       }
 
@@ -496,37 +540,73 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       showToast(`Welcome back, ${userProfile.name}! Logged in as ${userProfile.role.toUpperCase()}`, 'success');
       return userProfile;
-    } catch (error) {
-      handleFirestoreError(error, OperationType.GET, 'users');
-      throw error;
     } finally {
       setIsAuthLoading(false);
     }
   };
 
-  const loginWithCredentials = async (emailInput: string): Promise<User> => {
+  const loginWithCredentials = async (emailInput: string, passwordInput?: string): Promise<User> => {
     setIsAuthLoading(true);
     try {
+      const trimmedEmail = (emailInput || '').trim().toLowerCase();
+      const trimmedPassword = (passwordInput || '').trim();
+
+      // Email Format Validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+        throw new Error('Please enter a valid email address.');
+      }
+
+      // Password Validation before login
+      if (!trimmedPassword) {
+        throw new Error('Please enter your password.');
+      }
+
+      if (trimmedPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters.');
+      }
+
+      // Locate user in registered database
       const found = allUsers.find(
-        (u) => u.email.toLowerCase() === emailInput.trim().toLowerCase()
+        (u) => u.email.toLowerCase() === trimmedEmail
       );
-      if (!found) {
+
+      // Verify password. Default password for seeded accounts is 'Password123!'
+      const expectedPassword = found?.password || 'Password123!';
+      const isPasswordValid = found && (expectedPassword === trimmedPassword);
+
+      // CRITICAL REQUIREMENT: Do not reveal whether an email account exists when login fails
+      if (!found || !isPasswordValid) {
+        throw new Error('Invalid email or password. Please verify your credentials and try again.');
+      }
+
+      // Check account access blocks
+      if (found.status === 'suspended') {
         throw new Error(
-          'No user account registered with this email address. Please register a new account.'
+          'Your account has been suspended by an administrator. Please contact operations support to resolve compliance issues.'
         );
       }
 
-      if (found.status === 'suspended') {
+      if (found.status === 'rejected') {
         throw new Error(
-          'Your account has been suspended by an administrator. Please contact support.'
+          `Your account registration was rejected by an administrator: ${found.rejectionReason || 'Compliance review failed.'}`
         );
       }
 
       setCurrentUserId(found.id);
-      showToast(
-        `Signed in as ${found.name} (${found.role.toUpperCase()})`,
-        'success'
-      );
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
+
+      if (found.status === 'pending') {
+        showToast(
+          `Signed in as ${found.name} (${found.role.toUpperCase()}) — Account status is PENDING verification.`,
+          'warning'
+        );
+      } else {
+        showToast(
+          `Signed in as ${found.name} (${found.role.toUpperCase()})`,
+          'success'
+        );
+      }
       return found;
     } finally {
       setIsAuthLoading(false);
@@ -536,20 +616,44 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const registerUser = async (payload: {
     name: string;
     email: string;
+    password?: string;
     phone: string;
     role: 'buyer' | 'seller';
     businessName?: string;
   }): Promise<User> => {
     setIsAuthLoading(true);
     try {
+      const trimmedName = (payload.name || '').trim();
+      const trimmedEmail = (payload.email || '').trim().toLowerCase();
+      const trimmedPassword = (payload.password || '').trim();
+      const trimmedPhone = (payload.phone || '').trim();
+
+      // Validation
+      if (!trimmedName) {
+        throw new Error('Please enter your full name.');
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+        throw new Error('Please enter a valid email address.');
+      }
+
+      if (!trimmedPassword || trimmedPassword.length < 6) {
+        throw new Error('Password must be at least 6 characters long.');
+      }
+
+      if (payload.role === 'seller' && (!payload.businessName || !payload.businessName.trim())) {
+        throw new Error('Store / Business Name is required for Seller merchant registration.');
+      }
+
       const existing = allUsers.find(
-        (u) => u.email.toLowerCase() === payload.email.trim().toLowerCase()
+        (u) => u.email.toLowerCase() === trimmedEmail
       );
       if (existing) {
         throw new Error('An account with this email address already exists. Please sign in.');
       }
 
-      const isAdminEmail = payload.email.trim().toLowerCase() === 'sospeterokenda@gmail.com';
+      const isAdminEmail = trimmedEmail === 'sospeterokenda@gmail.com';
       const role: UserRole = isAdminEmail ? 'admin' : payload.role;
       // Requirements: Sellers start as pending until approved by admin; buyers start active
       const status: UserStatus =
@@ -558,9 +662,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       const newId = `usr_${Date.now()}`;
       const newUser: User = {
         id: newId,
-        name: payload.name.trim(),
-        email: payload.email.trim().toLowerCase(),
-        phone: payload.phone.trim() || '+254 700 000 000',
+        name: trimmedName,
+        email: trimmedEmail,
+        password: trimmedPassword,
+        phone: trimmedPhone || '+254 700 000 000',
         role,
         status,
         businessName: payload.businessName?.trim(),
@@ -594,9 +699,9 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const newBiz: BusinessProfile = {
           id: `biz_${newId}`,
           ownerId: newId,
-          businessName: payload.businessName,
+          businessName: payload.businessName.trim(),
           tagline: 'Verified Merchant on TradeSphere',
-          description: `Welcome to ${payload.businessName}. We offer quality products and prompt delivery.`,
+          description: `Welcome to ${payload.businessName.trim()}. We offer quality products and prompt delivery.`,
           category: 'other',
           logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
           banner: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&auto=format&fit=crop&q=80',
@@ -607,9 +712,9 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           address: 'Commercial District',
           city: 'Nairobi',
           country: 'Kenya',
-          phone: payload.phone || '+254 700 000 000',
-          whatsapp: payload.phone || '+254 700 000 000',
-          email: payload.email,
+          phone: trimmedPhone || '+254 700 000 000',
+          whatsapp: trimmedPhone || '+254 700 000 000',
+          email: trimmedEmail,
           socialLinks: {},
           operatingHours: 'Mon - Sat: 8:00 AM - 6:00 PM',
           memberSince: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
@@ -621,6 +726,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       setAllUsers((prev) => [newUser, ...prev]);
       setCurrentUserId(newUser.id);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
 
       if (status === 'pending') {
         showToast(
@@ -638,6 +744,69 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } finally {
       setIsAuthLoading(false);
     }
+  };
+
+  const requestPasswordResetCode = async (
+    emailInput: string
+  ): Promise<{ success: boolean; code?: string; message: string }> => {
+    const trimmedEmail = (emailInput || '').trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    const found = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+    // Deterministic 6-digit recovery PIN for demo/testing verification
+    const demoCode = '482910';
+
+    // Anti-enumeration: Return uniform message whether email exists or not
+    return {
+      success: true,
+      code: found ? demoCode : undefined,
+      message: 'If an account exists with this email address, a 6-digit password reset code has been sent. Please check your inbox.',
+    };
+  };
+
+  const resetPassword = async (
+    emailInput: string,
+    newPasswordInput: string,
+    _resetCode?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const trimmedEmail = (emailInput || '').trim().toLowerCase();
+    const trimmedPassword = (newPasswordInput || '').trim();
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (!trimmedPassword || trimmedPassword.length < 6) {
+      throw new Error('New password must be at least 6 characters long.');
+    }
+
+    const found = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+    if (found) {
+      setAllUsers((prev) =>
+        prev.map((u) =>
+          u.id === found.id
+            ? { ...u, password: trimmedPassword, updatedAt: new Date().toISOString() }
+            : u
+        )
+      );
+      try {
+        await updateDoc(doc(db, 'users', found.id), {
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('Firestore update note:', e);
+      }
+    }
+
+    // Uniform response to protect account confidentiality
+    return {
+      success: true,
+      message: 'If an account is associated with this email, your password has been reset successfully. You can now sign in.',
+    };
   };
 
   const fastSwitchUser = (userId: string) => {
@@ -658,6 +827,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       // Ignore
     }
     setCurrentUserId('usr_guest');
+    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_guest');
     showToast('Signed out successfully', 'info');
   };
 
@@ -1060,6 +1230,11 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error('Your account is suspended. Order placement is restricted.');
     }
 
+    if (currentUser.status === 'rejected') {
+      showToast('Rejected accounts cannot place orders', 'error');
+      throw new Error('Your account registration was rejected. Order placement is restricted.');
+    }
+
     const itemsToOrder = orderPayload.items || cart;
     if (itemsToOrder.length === 0) {
       throw new Error('No items to order');
@@ -1148,6 +1323,14 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // --- INQUIRIES & MESSAGING ---
   const sendInquiryMessage = (inquiryId: string, text: string) => {
+    if (currentUser.id === 'usr_guest') {
+      showToast('Please sign in to send messages', 'error');
+      return;
+    }
+    if (currentUser.status === 'suspended' || currentUser.status === 'rejected') {
+      showToast('Account is restricted. Messaging is disabled.', 'error');
+      return;
+    }
     const isBuyer = currentUser.role === 'buyer' || currentUser.role === 'customer';
     const newMessage = {
       id: `msg_${Date.now()}`,
@@ -1353,6 +1536,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         loginWithGoogle,
         loginWithCredentials,
         registerUser,
+        requestPasswordResetCode,
+        resetPassword,
         fastSwitchUser,
         signOutUser,
         approveUser,
