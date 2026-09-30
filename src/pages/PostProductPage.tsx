@@ -76,10 +76,15 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
   const [featured, setFeatured] = useState(editProduct?.featured || false);
 
   // Specifications key-value pairs
-  const [specs, setSpecs] = useState<{ key: string; value: string }[]>([
-    { key: 'Brand', value: 'Original Certified' },
-    { key: 'Warranty', value: '1 Year Manufacturer Warranty' },
-  ]);
+  const [specs, setSpecs] = useState<{ key: string; value: string }[]>(() => {
+    if (editProduct?.specifications && Object.keys(editProduct.specifications).length > 0) {
+      return Object.entries(editProduct.specifications).map(([key, value]) => ({ key, value }));
+    }
+    return [
+      { key: 'Brand', value: 'Original Certified' },
+      { key: 'Warranty', value: '1 Year Manufacturer Warranty' },
+    ];
+  });
 
   // UI state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -220,6 +225,14 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
     setSpecs((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleSpecChange = (idx: number, field: 'key' | 'value', val: string) => {
+    setSpecs((prev) => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
   const handleToggleDelivery = (opt: DeliveryOption) => {
     setDeliveryOptions((prev) =>
       prev.includes(opt) ? prev.filter((item) => item !== opt) : [...prev, opt]
@@ -258,7 +271,8 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
     if (stock === '' || Number(stock) < 0) errs.stock = 'Stock quantity cannot be negative';
     if (images.length === 0) errs.images = 'At least one photo is required';
     if (!sellerPhone.trim()) errs.sellerPhone = 'Seller phone is required';
-    if (!location.trim()) errs.location = 'Location is required';
+    if (!location.trim()) errs.location = 'Pickup/store location is required';
+    if (!city.trim()) errs.city = 'City/region is required';
     if (deliveryOptions.length === 0) errs.delivery = 'Select at least one delivery option';
     if (paymentOptions.length === 0) errs.payment = 'Select at least one payment method';
 
@@ -275,64 +289,78 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
 
     setIsSubmitting(true);
 
+    // Map specs array to key-value record
     const specsObj: Record<string, string> = {};
     specs.forEach((s) => {
-      if (s.key.trim() && s.value.trim()) {
-        specsObj[s.key.trim()] = s.value.trim();
+      const k = s.key.trim();
+      const v = s.value.trim();
+      if (k && v) {
+        specsObj[k] = v;
       }
     });
 
     try {
       if (editProduct) {
-        await updateProduct(editProduct.id, {
-          title,
+        const updatedFields: Partial<Product> = {
+          title: title.trim(),
           category,
           condition,
-          description,
+          description: description.trim(),
           price: Number(price),
           discountPrice: discountPrice !== '' ? Number(discountPrice) : undefined,
           stock: Number(stock),
-          businessName,
-          sellerPhone,
-          sellerWhatsapp,
-          location,
-          city,
-          images,
-          videoUrl,
-          deliveryOptions,
-          deliveryFee: deliveryFee !== '' ? Number(deliveryFee) : 0,
-          paymentOptions,
-          featured,
-          specifications: specsObj,
-        });
-        setIsSubmitting(false);
-        onSuccess(editProduct);
-      } else {
-        const created = await addProduct({
-          title,
-          category,
-          condition,
-          description,
-          price: Number(price),
-          discountPrice: discountPrice !== '' ? Number(discountPrice) : undefined,
-          stock: Number(stock),
-          businessId: userBiz?.id,
-          businessName,
-          businessVerified: true,
-          sellerId: currentUser.id,
-          sellerPhone,
-          sellerWhatsapp,
-          location,
-          city,
+          businessId: userBiz?.id || editProduct.businessId,
+          businessName: businessName.trim() || userBiz?.businessName || currentUser.businessName || currentUser.name,
+          businessVerified: editProduct.businessVerified ?? true,
+          businessLogo: userBiz?.logo || editProduct.businessLogo,
+          sellerPhone: sellerPhone.trim(),
+          sellerWhatsapp: sellerWhatsapp.trim() || sellerPhone.trim(),
+          location: location.trim(),
+          city: city.trim(),
           images,
           videoUrl: videoUrl.trim() || undefined,
           deliveryOptions,
           deliveryFee: deliveryFee !== '' ? Number(deliveryFee) : 0,
           paymentOptions,
           featured,
-          status: 'active',
           specifications: specsObj,
+        };
+
+        await updateProduct(editProduct.id, updatedFields);
+        setIsSubmitting(false);
+        onSuccess({
+          ...editProduct,
+          ...updatedFields,
         });
+      } else {
+        const productPayload = {
+          title: title.trim(),
+          category,
+          condition,
+          description: description.trim(),
+          price: Number(price),
+          discountPrice: discountPrice !== '' ? Number(discountPrice) : undefined,
+          stock: Number(stock),
+          businessId: userBiz?.id,
+          businessName: businessName.trim() || userBiz?.businessName || currentUser.businessName || currentUser.name,
+          businessVerified: true,
+          businessLogo: userBiz?.logo,
+          sellerId: currentUser.id,
+          sellerPhone: sellerPhone.trim(),
+          sellerWhatsapp: sellerWhatsapp.trim() || sellerPhone.trim(),
+          location: location.trim(),
+          city: city.trim(),
+          images,
+          videoUrl: videoUrl.trim() || undefined,
+          deliveryOptions,
+          deliveryFee: deliveryFee !== '' ? Number(deliveryFee) : 0,
+          paymentOptions,
+          featured,
+          status: 'active' as const,
+          specifications: specsObj,
+        };
+
+        const created = await addProduct(productPayload);
         setIsSubmitting(false);
         onSuccess(created);
       }
@@ -350,29 +378,36 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
     category,
     condition,
     description: description || 'Description will appear here...',
-    price: Number(price) || 100,
+    price: Number(price) || 0,
     discountPrice: discountPrice !== '' ? Number(discountPrice) : undefined,
     stock: Number(stock) || 1,
     location: location || 'Nairobi, Kenya',
     city: city || 'Nairobi',
     images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=800&auto=format&fit=crop&q=80'],
-    videoUrl,
+    videoUrl: videoUrl.trim() || undefined,
     deliveryOptions,
     deliveryFee: Number(deliveryFee) || 0,
     paymentOptions,
     featured,
     status: 'active',
-    views: 1,
-    inquiriesCount: 0,
+    views: editProduct?.views || 1,
+    inquiriesCount: editProduct?.inquiriesCount || 0,
     sellerId: currentUser.id,
-    businessName,
+    businessId: userBiz?.id,
+    businessName: businessName || userBiz?.businessName || currentUser.businessName || currentUser.name,
     businessVerified: true,
+    businessLogo: userBiz?.logo,
     sellerPhone,
     sellerWhatsapp,
-    createdAt: new Date().toISOString(),
-    specifications: {},
-    rating: 5.0,
-    reviewsCount: 0,
+    createdAt: editProduct?.createdAt || new Date().toISOString(),
+    specifications: specs.reduce((acc, curr) => {
+      if (curr.key.trim() && curr.value.trim()) {
+        acc[curr.key.trim()] = curr.value.trim();
+      }
+      return acc;
+    }, {} as Record<string, string>),
+    rating: editProduct?.rating || 5.0,
+    reviewsCount: editProduct?.reviewsCount || 0,
   };
 
   return (
@@ -570,7 +605,74 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Media & Images */}
+          {/* Section 3: Technical Specifications & Attributes */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs">
+                  3
+                </span>
+                <span>Specifications & Item Attributes</span>
+              </h3>
+              <button
+                type="button"
+                onClick={handleAddSpec}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Specification</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Provide structured item attributes (e.g., Brand, Warranty, Color, Storage, Model) to help buyers inspect product details.
+            </p>
+
+            <div className="space-y-2.5">
+              {specs.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={item.key}
+                    onChange={(e) => handleSpecChange(idx, 'key', e.target.value)}
+                    placeholder="Attribute (e.g. Brand)"
+                    className="w-1/3 p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    value={item.value}
+                    onChange={(e) => handleSpecChange(idx, 'value', e.target.value)}
+                    placeholder="Value (e.g. Apple M3)"
+                    className="flex-1 p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveSpec(idx)}
+                    title="Remove specification"
+                    className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+
+              {specs.length === 0 && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center">
+                  <p className="text-xs text-slate-500 mb-2">No specifications added yet.</p>
+                  <button
+                    type="button"
+                    onClick={handleAddSpec}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 text-xs font-bold rounded-xl transition"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add First Attribute</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 4: Media & Images */}
           <div className="bg-white p-4 sm:p-6 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
             {/* Hidden native file input for internal storage upload */}
             <input
@@ -587,7 +689,7 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <span className="w-6 h-6 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center text-xs">
-                  3
+                  4
                 </span>
                 <span>Images & Video Showcase</span>
               </h3>
@@ -784,11 +886,11 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
             </div>
           </div>
 
-          {/* Section 4: Seller Details, Location & Delivery */}
+          {/* Section 5: Seller Details, Location & Delivery */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center text-xs">
-                4
+                5
               </span>
               <span>Delivery & Payment Preferences</span>
             </h3>
@@ -922,11 +1024,11 @@ export const PostProductPage: React.FC<PostProductPageProps> = ({
             </div>
           </div>
 
-          {/* Section 5: Promotion & Monetization Tier */}
+          {/* Section 6: Promotion & Monetization Tier */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <span className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs">
-                5
+                6
               </span>
               <span>Listing Visibility & Promotion</span>
             </h3>

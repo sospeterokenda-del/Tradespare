@@ -184,6 +184,8 @@ export interface AdminDetails {
     avatar: string;
     role: string;
     department: string;
+    bio?: string;
+    location?: string;
     permissions: string[];
   };
   platformBranding: {
@@ -205,7 +207,8 @@ export interface AdminDetails {
     contentModerationMode: 'auto_approve' | 'require_review' | 'ai_flagging';
     mpesaSandbox: boolean;
     allowGuestInquiries: boolean;
-    feeCommissionRate: number; // percentage e.g. 3.5
+    feeCommissionRate: number; // percentage e.g. 2.5
+    maintenanceMode?: boolean;
   };
   notificationPreferences: {
     emailOnNewListing: boolean;
@@ -221,6 +224,51 @@ export interface CategoryInfo {
   iconName: string;
   description: string;
   itemCount: number;
-  image: string;
-  popularSearchTerms: string[];
+  image?: string;
+  popular?: boolean;
+  popularSearchTerms?: string[];
+}
+
+export interface AdminActivityLog {
+  id: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  action: string;
+  category:
+    | 'users'
+    | 'approvals'
+    | 'products'
+    | 'businesses'
+    | 'categories'
+    | 'announcements'
+    | 'reports'
+    | 'financial_kpis'
+    | 'safety_flags'
+    | 'roles_permissions'
+    | 'branding'
+    | 'website_settings'
+    | 'security';
+  targetId?: string;
+  targetName?: string;
+  details: string;
+  timestamp: string;
+  severity: 'info' | 'warning' | 'critical' | 'success';
+}
+
+export interface SafetyFlag {
+  id: string;
+  type: 'listing' | 'seller' | 'buyer' | 'message' | 'transaction';
+  targetId: string;
+  targetTitle: string;
+  reportedBy: string;
+  reporterEmail?: string;
+  reason: string;
+  details?: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'resolved' | 'dismissed';
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNotes?: string;
 }

@@ -236,6 +236,42 @@
         }
       },
       "required": ["id", "orderNumber", "buyerId", "totalAmount", "orderStatus", "createdAt"]
+    },
+    "AdminActivityLog": {
+      "title": "AdminActivityLog",
+      "description": "Tamper-evident audit log recording administrative actions performed by the Super Admin.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "adminId": { "type": "string", "maxLength": 128 },
+        "adminName": { "type": "string", "maxLength": 100 },
+        "adminEmail": { "type": "string", "maxLength": 150 },
+        "action": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetName": { "type": "string", "maxLength": 150 },
+        "details": { "type": "string", "maxLength": 500 },
+        "timestamp": { "type": "string", "maxLength": 50 },
+        "severity": { "type": "string", "enum": ["info", "warning", "critical", "success"] }
+      },
+      "required": ["id", "adminName", "adminEmail", "action", "category", "targetId", "details", "timestamp"]
+    },
+    "SafetyFlag": {
+      "title": "SafetyFlag",
+      "description": "Platform trust and safety report flagged for Super Admin investigation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["listing", "seller", "buyer", "message", "transaction"] },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "targetTitle": { "type": "string", "maxLength": 150 },
+        "reportedBy": { "type": "string", "maxLength": 100 },
+        "reason": { "type": "string", "maxLength": 500 },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "status": { "type": "string", "enum": ["pending", "resolved", "dismissed"] },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "type", "targetId", "targetTitle", "reportedBy", "reason", "severity", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -254,6 +290,14 @@
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
       "description": "Purchase orders placed by customers and fulfilled by sellers"
+    },
+    "/admin_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminActivityLog" },
+      "description": "Audit trail logs accessible only by the verified Super Admin"
+    },
+    "/safety_flags/{flagId}": {
+      "schema": { "$ref": "#/entities/SafetyFlag" },
+      "description": "Safety flags and moderation reports managed by the Super Admin"
     }
   }
 }

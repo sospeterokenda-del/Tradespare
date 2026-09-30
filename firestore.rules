@@ -24,12 +24,16 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Explicit Admin verification
-    function isAdmin() {
+    // Super Admin: Strictly sospeterokenda@gmail.com with verified email or stored admin record
+    function isSuperAdmin() {
       return isSignedIn() && (
         (request.auth.token.email is string && request.auth.token.email == 'sospeterokenda@gmail.com') ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.email == 'sospeterokenda@gmail.com')
       );
+    }
+
+    function isAdmin() {
+      return isSuperAdmin();
     }
 
     // Check if the current user profile exists and is active
@@ -194,6 +198,20 @@ service cloud.firestore {
         );
 
       allow delete: if isAdmin();
+    }
+
+    // ADMIN ACTIVITY LOGS COLLECTION (Super Admin audit trail)
+    match /admin_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidId(logId);
+      allow update, delete: if false; // Immutable audit trail
+    }
+
+    // SAFETY FLAGS COLLECTION (Trust & Safety reports)
+    match /safety_flags/{flagId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && isValidId(flagId);
+      allow update, delete: if isAdmin();
     }
   }
 }

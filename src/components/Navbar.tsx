@@ -61,6 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const {
     currentUser,
+    isSuperAdmin,
     signOutUser,
     wishlist,
     cartCount,
@@ -77,15 +78,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const locations = ['All Locations', 'Nairobi', 'Eldoret', 'Mombasa', 'Kisumu', 'Nakuru'];
 
-  // RBAC Permission Gates
+  // RBAC Permission Gates: Strictly restrict Super Admin to sospeterokenda@gmail.com
   const isGuest = currentUser.id === 'usr_guest';
-  const isAdmin = currentUser.role === 'admin';
+  const isAdmin = isSuperAdmin;
   const isSeller = currentUser.role === 'seller';
   const isApprovedSeller = isSeller && currentUser.status === 'active';
   const isPendingSeller = isSeller && currentUser.status === 'pending';
   const canPostProduct = isAdmin || isApprovedSeller;
   const canAccessSellerHub = isAdmin || isSeller;
-  const canAccessAdminHub = isAdmin;
+  const canAccessAdminHub = isSuperAdmin;
 
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
@@ -412,17 +413,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
-                    {/* Admin Governance Center: STRICTLY ADMIN ONLY (HIDDEN FOR BUYERS & SELLERS) */}
+                    {/* Admin Governance Center: STRICTLY SUPER ADMIN ONLY (HIDDEN FOR BUYERS & SELLERS) */}
                     {canAccessAdminHub && (
                       <button
                         onClick={() => {
                           setIsUserMenuOpen(false);
                           onNavigate('admin-dashboard');
                         }}
-                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-700 bg-rose-50/70 hover:bg-rose-100/70 flex items-center gap-2.5 my-0.5"
                       >
                         <Shield className="w-4 h-4 text-rose-600" />
-                        <span>Admin Governance Center</span>
+                        <span>Super Admin Center (Sospeter Okenda)</span>
                       </button>
                     )}
 
@@ -682,17 +683,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Admin Governance Center: STRICTLY ADMIN ONLY */}
+            {/* Admin Governance Center: STRICTLY SUPER ADMIN ONLY */}
             {canAccessAdminHub && (
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
                   onNavigate('admin-dashboard');
                 }}
-                className="w-full text-left px-3 py-3 rounded-xl text-sm font-semibold text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 min-h-[44px]"
+                className="w-full text-left px-3 py-3 rounded-xl text-sm font-semibold text-rose-700 bg-rose-50/70 hover:bg-rose-100/70 flex items-center gap-2.5 min-h-[44px]"
               >
                 <Shield className="w-4 h-4 text-rose-600" />
-                <span>Admin Governance Center</span>
+                <span>Super Admin Mode (Sospeter Okenda)</span>
               </button>
             )}
           </div>

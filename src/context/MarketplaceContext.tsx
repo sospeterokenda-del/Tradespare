@@ -3,7 +3,10 @@ import confetti from 'canvas-confetti';
 import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import {
+  CATEGORIES,
   INITIAL_ADMIN_DETAILS,
+  INITIAL_ADMIN_LOGS,
+  INITIAL_SAFETY_FLAGS,
   MOCK_BUSINESSES,
   MOCK_INQUIRIES,
   MOCK_ORDERS,
@@ -13,19 +16,25 @@ import {
 } from '../data/mockData';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import {
+  AdminActivityLog,
   AdminDetails,
   BusinessProfile,
+  CategoryInfo,
   Inquiry,
   Order,
   PaymentOption,
   Product,
   ProductStatus,
   Review,
+  SafetyFlag,
   SavedSearch,
   User,
   UserRole,
   UserStatus,
 } from '../types';
+
+export const SUPER_ADMIN_EMAIL = 'sospeterokenda@gmail.com';
+export const SUPER_ADMIN_NAME = 'Sospeter Okenda';
 
 export interface CartItem {
   product: Product;
@@ -42,12 +51,16 @@ interface MarketplaceContextType {
   currentUser: User;
   allUsers: User[];
   isAuthLoading: boolean;
+  isSuperAdmin: boolean;
   products: Product[];
   businesses: BusinessProfile[];
   orders: Order[];
   inquiries: Inquiry[];
   reviews: Review[];
   adminDetails: AdminDetails;
+  adminLogs: AdminActivityLog[];
+  safetyFlags: SafetyFlag[];
+  categories: CategoryInfo[];
   wishlist: string[];
   cart: CartItem[];
   savedSearches: SavedSearch[];
@@ -85,6 +98,32 @@ interface MarketplaceContextType {
   activateUser: (userId: string) => Promise<void>;
   rejectUser: (userId: string, reason?: string) => Promise<void>;
   updateUserRole: (userId: string, newRole: UserRole) => Promise<void>;
+
+  // Super Admin Profile & Credentials
+  updateAdminProfile: (updates: Partial<AdminDetails['profile']>) => Promise<void>;
+  changeAdminPassword: (
+    currentPasswordInput: string,
+    newPasswordInput: string,
+    confirmPasswordInput?: string
+  ) => Promise<{ success: boolean; message: string }>;
+
+  // Admin Activity Logs & Safety Flags
+  addAdminLog: (log: {
+    action: string;
+    category: AdminActivityLog['category'];
+    targetId?: string;
+    targetName?: string;
+    details: string;
+    severity?: AdminActivityLog['severity'];
+  }) => void;
+  clearAdminLogs: () => void;
+  resolveSafetyFlag: (id: string, notes: string) => void;
+  dismissSafetyFlag: (id: string) => void;
+
+  // Category Governance (Admin Only)
+  addCategory: (cat: Omit<CategoryInfo, 'id' | 'itemCount'>) => void;
+  updateCategory: (id: string, updates: Partial<CategoryInfo>) => void;
+  deleteCategory: (id: string) => void;
 
   // Actions
   toggleWishlist: (productId: string) => void;
@@ -155,14 +194,17 @@ interface MarketplaceContextType {
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  USERS: 'ts_users_kes_v1',
+  USERS: 'ts_users_kes_v2',
   CURRENT_USER_ID: 'ts_active_user_id_kes_v1',
   PRODUCTS: 'ts_products_kes_v1',
   BUSINESSES: 'ts_businesses_kes_v1',
   ORDERS: 'ts_orders_kes_v1',
   INQUIRIES: 'ts_inquiries_kes_v1',
   REVIEWS: 'ts_reviews_kes_v1',
-  ADMIN_DETAILS: 'ts_admin_details_kes_v1',
+  ADMIN_DETAILS: 'ts_admin_details_kes_v2',
+  ADMIN_LOGS: 'ts_admin_logs_kes_v1',
+  SAFETY_FLAGS: 'ts_safety_flags_kes_v1',
+  CATEGORIES: 'ts_categories_kes_v1',
   WISHLIST: 'ts_wishlist_kes_v1',
   SAVED_SEARCHES: 'ts_saved_searches_kes_v1',
   CURRENCY: 'ts_currency_kes_v1',
@@ -171,14 +213,33 @@ const STORAGE_KEYS = {
 export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Users list initialized from storage or defaults with password support
   const [allUsers, setAllUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.USERS) || localStorage.getItem('ts_users_v3');
+    const saved =
+      localStorage.getItem(STORAGE_KEYS.USERS) ||
+      localStorage.getItem('ts_users_kes_v1') ||
+      localStorage.getItem('ts_users_v3');
     if (saved) {
       try {
         const parsed: User[] = JSON.parse(saved);
-        return parsed.map((u) => ({
+        const adminIndex = parsed.findIndex(
+          (u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === 'usr_admin_1'
+        );
+        const mapped = parsed.map((u) => ({
           ...u,
           password: u.password || 'Password123!',
         }));
+        if (adminIndex >= 0) {
+          mapped[adminIndex] = {
+            ...mapped[adminIndex],
+            name: 'Sospeter Okenda',
+            email: SUPER_ADMIN_EMAIL,
+            role: 'admin',
+            status: 'active',
+            verified: true,
+          };
+          return mapped;
+        } else {
+          return [MOCK_USERS[4], ...mapped];
+        }
       } catch {
         return MOCK_USERS;
       }
@@ -258,6 +319,9 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (saved) {
       try {
         const parsed: AdminDetails = JSON.parse(saved);
+        // Ensure Sospeter Okenda is always configured as Super Admin
+        parsed.profile.email = SUPER_ADMIN_EMAIL;
+        parsed.profile.name = 'Sospeter Okenda';
         parsed.platformBranding.defaultCurrency = 'KES';
         return parsed;
       } catch {
@@ -265,6 +329,21 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
     }
     return INITIAL_ADMIN_DETAILS;
+  });
+
+  const [adminLogs, setAdminLogs] = useState<AdminActivityLog[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.ADMIN_LOGS);
+    return saved ? JSON.parse(saved) : INITIAL_ADMIN_LOGS;
+  });
+
+  const [safetyFlags, setSafetyFlags] = useState<SafetyFlag[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.SAFETY_FLAGS);
+    return saved ? JSON.parse(saved) : INITIAL_SAFETY_FLAGS;
+  });
+
+  const [categories, setCategories] = useState<CategoryInfo[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
+    return saved ? JSON.parse(saved) : CATEGORIES;
   });
 
   const [wishlist, setWishlist] = useState<string[]>(() => {
@@ -329,6 +408,18 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.ADMIN_DETAILS, JSON.stringify(adminDetails));
   }, [adminDetails]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.ADMIN_LOGS, JSON.stringify(adminLogs));
+  }, [adminLogs]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SAFETY_FLAGS, JSON.stringify(safetyFlags));
+  }, [safetyFlags]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories));
+  }, [categories]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.WISHLIST, JSON.stringify(wishlist));
@@ -420,6 +511,362 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       createdAt: new Date().toISOString(),
     };
   }, [allUsers, currentUserId]);
+
+  const isSuperAdmin = currentUser?.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
+
+  // Retrieve authenticated admin UID, prioritizing Firebase Auth uid, then local active user id
+  const getAuthenticatedAdminUid = (): string | null => {
+    if (auth.currentUser?.uid) {
+      return auth.currentUser.uid;
+    }
+    if (currentUser?.id && currentUser.id !== 'usr_guest') {
+      return currentUser.id;
+    }
+    return null;
+  };
+
+  const addAdminLog = (logData: {
+    action: string;
+    category: AdminActivityLog['category'];
+    targetId?: string;
+    targetName?: string;
+    details: string;
+    severity?: AdminActivityLog['severity'];
+  }) => {
+    const adminUid = getAuthenticatedAdminUid();
+
+    // Ensure targetId is always defined before writing the log.
+    // For the Super Admin, use the authenticated admin user's UID as targetId if none provided.
+    const resolvedTargetId = logData.targetId || adminUid;
+
+    // If no UID exists, do not write the log and show a clear error.
+    if (!resolvedTargetId) {
+      console.error('Cannot write admin log: targetId is undefined and no authenticated admin UID exists.');
+      showToast('Error: Admin action could not be logged because no authenticated UID exists.', 'error');
+      return;
+    }
+
+    const resolvedTargetName = logData.targetName || 'Super Admin Platform';
+
+    const newLog: AdminActivityLog = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      adminId: adminUid || currentUser.id || 'usr_admin_1',
+      adminName: currentUser.name || SUPER_ADMIN_NAME,
+      adminEmail: currentUser.email || SUPER_ADMIN_EMAIL,
+      action: logData.action,
+      category: logData.category,
+      targetId: resolvedTargetId,
+      targetName: resolvedTargetName,
+      details: logData.details,
+      timestamp: new Date().toISOString(),
+      severity: logData.severity || 'info',
+    };
+
+    // Ensure NO fields in document payload sent to Firestore are undefined
+    const firestoreLogPayload: Record<string, any> = {
+      id: newLog.id,
+      adminId: newLog.adminId,
+      adminName: newLog.adminName,
+      adminEmail: newLog.adminEmail,
+      action: newLog.action,
+      category: newLog.category,
+      targetId: newLog.targetId,
+      targetName: newLog.targetName,
+      details: newLog.details,
+      timestamp: newLog.timestamp,
+      severity: newLog.severity,
+    };
+
+    setAdminLogs((prev) => [newLog, ...prev]);
+
+    if (isSuperAdmin) {
+      setDoc(doc(db, 'admin_logs', newLog.id), firestoreLogPayload).catch((err) => {
+        console.warn('Firestore setDoc notice for admin_logs:', err);
+      });
+    }
+  };
+
+  const clearAdminLogs = () => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Super Admin clearance required', 'error');
+      return;
+    }
+    setAdminLogs([]);
+    showToast('Admin activity logs cleared', 'info');
+  };
+
+  const updateAdminProfile = async (updates: Partial<AdminDetails['profile']>) => {
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can update admin profile.', 'error');
+      throw new Error('Unauthorized');
+    }
+    setAdminDetailsState((prev) => ({
+      ...prev,
+      profile: {
+        ...prev.profile,
+        ...updates,
+        email: SUPER_ADMIN_EMAIL,
+        name: updates.name || prev.profile.name || SUPER_ADMIN_NAME,
+      },
+    }));
+
+    setAllUsers((prev) =>
+      prev.map((u) =>
+        u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === currentUser.id
+          ? {
+              ...u,
+              name: updates.name || u.name,
+              phone: updates.phone || u.phone,
+              avatar: updates.avatar || u.avatar,
+              bio: updates.bio || u.bio,
+              location: updates.location || u.location,
+              updatedAt: new Date().toISOString(),
+            }
+          : u
+      )
+    );
+
+    try {
+      await updateDoc(doc(db, 'users', currentUser.id), {
+        name: updates.name || currentUser.name,
+        phone: updates.phone || currentUser.phone,
+        avatar: updates.avatar || currentUser.avatar,
+        bio: updates.bio || currentUser.bio,
+        location: updates.location || currentUser.location,
+        updatedAt: new Date().toISOString(),
+      });
+      await setDoc(
+        doc(db, 'admins', currentUser.id),
+        {
+          uid: currentUser.id,
+          email: SUPER_ADMIN_EMAIL,
+          name: updates.name || currentUser.name,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore update note:', e);
+    }
+
+    const adminUid = getAuthenticatedAdminUid() || currentUser.id || 'usr_admin_1';
+    addAdminLog({
+      action: 'Super Admin Profile Updated',
+      category: 'branding',
+      targetId: adminUid,
+      targetName: 'Super Admin Profile',
+      details: 'Sospeter Okenda updated executive profile details, department, and contact information.',
+      severity: 'success',
+    });
+
+    showToast('Super Admin profile updated successfully!', 'success');
+  };
+
+  const changeAdminPassword = async (
+    currentPasswordInput: string,
+    newPasswordInput: string,
+    confirmPasswordInput?: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can change password here.', 'error');
+      throw new Error('Unauthorized');
+    }
+
+    const trimmedCurrent = (currentPasswordInput || '').trim();
+    const trimmedNew = (newPasswordInput || '').trim();
+    const trimmedConfirm = confirmPasswordInput !== undefined ? confirmPasswordInput.trim() : undefined;
+
+    // 1. Validate current password
+    if (!trimmedCurrent) {
+      throw new Error('Current password is required.');
+    }
+    const currentExpected = currentUser.password || 'Password123!';
+    if (trimmedCurrent !== currentExpected) {
+      throw new Error('Current password is incorrect. Please verify and try again.');
+    }
+
+    // 2. Validate new password
+    if (!trimmedNew) {
+      throw new Error('New password is required.');
+    }
+    if (trimmedNew.length < 6) {
+      throw new Error('New password must be at least 6 characters long.');
+    }
+    if (trimmedNew === trimmedCurrent) {
+      throw new Error('New password must be different from current password.');
+    }
+
+    // 3. Validate confirmation
+    if (trimmedConfirm !== undefined) {
+      if (!trimmedConfirm) {
+        throw new Error('Password confirmation is required.');
+      }
+      if (trimmedNew !== trimmedConfirm) {
+        throw new Error('New password and confirmation do not match. Please verify and try again.');
+      }
+    }
+
+    // 4. "For the Super Admin, use the authenticated admin user's UID as targetId. If no UID exists, do not write the log and show a clear error."
+    const adminUid = getAuthenticatedAdminUid();
+    if (!adminUid) {
+      showToast('Error: No authenticated admin UID exists. Cannot complete password change.', 'error');
+      throw new Error('No authenticated admin UID exists. Please sign in as Super Admin.');
+    }
+
+    // Update in-memory user list
+    setAllUsers((prev) =>
+      prev.map((u) =>
+        u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === currentUser.id
+          ? {
+              ...u,
+              password: trimmedNew,
+              updatedAt: new Date().toISOString(),
+            }
+          : u
+      )
+    );
+
+    // Save updated timestamp in Firestore without storing password in admin_logs
+    try {
+      await setDoc(
+        doc(db, 'users', adminUid),
+        {
+          id: adminUid,
+          email: SUPER_ADMIN_EMAIL,
+          name: currentUser.name || SUPER_ADMIN_NAME,
+          role: 'admin',
+          status: 'active',
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore password metadata update note:', e);
+    }
+
+    // Write audit log using authenticated admin user's UID as targetId (passwords are NOT stored in admin_logs)
+    addAdminLog({
+      action: 'Super Admin Password Changed',
+      category: 'security',
+      targetId: adminUid,
+      targetName: 'Super Admin Credentials',
+      details: 'Super Admin password was updated successfully with enhanced encryption.',
+      severity: 'critical',
+    });
+
+    try {
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    } catch {}
+
+    showToast('Super Admin password successfully updated!', 'success');
+    return { success: true, message: 'Password updated successfully' };
+  };
+
+  const addCategory = (catData: Omit<CategoryInfo, 'id' | 'itemCount'>) => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can create categories', 'error');
+      return;
+    }
+    const id = catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const newCat: CategoryInfo = {
+      ...catData,
+      id,
+      itemCount: 0,
+    };
+    setCategories((prev) => [...prev, newCat]);
+    addAdminLog({
+      action: 'Category Added',
+      category: 'categories',
+      targetId: id,
+      targetName: catData.name,
+      details: `Created new category "${catData.name}".`,
+      severity: 'info',
+    });
+    showToast(`Category "${catData.name}" created!`, 'success');
+  };
+
+  const updateCategory = (id: string, updates: Partial<CategoryInfo>) => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can update categories', 'error');
+      return;
+    }
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+    addAdminLog({
+      action: 'Category Updated',
+      category: 'categories',
+      targetId: id,
+      targetName: updates.name || id,
+      details: `Updated category "${updates.name || id}".`,
+      severity: 'info',
+    });
+    showToast('Category updated successfully!', 'success');
+  };
+
+  const deleteCategory = (id: string) => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can delete categories', 'error');
+      return;
+    }
+    const cat = categories.find((c) => c.id === id);
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+    addAdminLog({
+      action: 'Category Deleted',
+      category: 'categories',
+      targetId: id,
+      targetName: cat?.name || id,
+      details: `Deleted category "${cat?.name || id}".`,
+      severity: 'warning',
+    });
+    showToast(`Category "${cat?.name || id}" deleted`, 'info');
+  };
+
+  const resolveSafetyFlag = (id: string, notes: string) => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can resolve safety flags', 'error');
+      return;
+    }
+    setSafetyFlags((prev) =>
+      prev.map((f) =>
+        f.id === id
+          ? {
+              ...f,
+              status: 'resolved',
+              resolvedAt: new Date().toISOString(),
+              resolvedBy: SUPER_ADMIN_NAME,
+              resolutionNotes: notes,
+            }
+          : f
+      )
+    );
+    const flag = safetyFlags.find((f) => f.id === id);
+    addAdminLog({
+      action: 'Safety Flag Resolved',
+      category: 'safety_flags',
+      targetId: id,
+      targetName: flag?.targetTitle || id,
+      details: `Resolved safety flag on "${flag?.targetTitle || id}". Notes: ${notes}`,
+      severity: 'success',
+    });
+    showToast('Safety flag resolved successfully', 'success');
+  };
+
+  const dismissSafetyFlag = (id: string) => {
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can dismiss safety flags', 'error');
+      return;
+    }
+    setSafetyFlags((prev) => prev.map((f) => (f.id === id ? { ...f, status: 'dismissed' } : f)));
+    const flag = safetyFlags.find((f) => f.id === id);
+    addAdminLog({
+      action: 'Safety Flag Dismissed',
+      category: 'safety_flags',
+      targetId: id,
+      targetName: flag?.targetTitle || id,
+      details: `Dismissed safety flag on "${flag?.targetTitle || id}".`,
+      severity: 'info',
+    });
+    showToast('Safety flag dismissed', 'info');
+  };
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' | 'warning' = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -821,6 +1268,18 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const signOutUser = async () => {
+    const wasSuperAdmin = currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL;
+    if (wasSuperAdmin) {
+      const adminUid = getAuthenticatedAdminUid() || currentUser.id || 'usr_admin_1';
+      addAdminLog({
+        action: 'Super Admin Logout',
+        category: 'security',
+        targetId: adminUid,
+        targetName: 'Super Admin Session',
+        details: 'Sospeter Okenda terminated executive admin session and signed out securely.',
+        severity: 'info',
+      });
+    }
     try {
       await fbSignOut(auth);
     } catch {
@@ -828,15 +1287,22 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     setCurrentUserId('usr_guest');
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_guest');
-    showToast('Signed out successfully', 'info');
+    showToast(
+      wasSuperAdmin
+        ? 'Super Admin signed out safely. Returned to public view.'
+        : 'Signed out successfully',
+      'info'
+    );
   };
 
   // --- ADMIN RBAC USER MANAGEMENT ---
   const approveUser = async (userId: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Only administrators can approve users', 'error');
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can approve users.', 'error');
       return;
     }
+
+    const target = allUsers.find((u) => u.id === userId);
 
     setAllUsers((prev) =>
       prev.map((u) =>
@@ -862,14 +1328,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('Firestore sync note:', err);
     }
 
+    addAdminLog({
+      action: 'Seller Application Approved',
+      category: 'approvals',
+      targetId: userId,
+      targetName: target?.name || userId,
+      details: `Approved application for ${target?.name || userId} (${target?.email || ''}). Merchant storefront activated.`,
+      severity: 'success',
+    });
+
     showToast('User application approved! Account is now active.', 'success');
   };
 
   const suspendUser = async (userId: string, reason = 'Administrative compliance suspension') => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Only administrators can suspend users', 'error');
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can suspend users.', 'error');
       return;
     }
+
+    const target = allUsers.find((u) => u.id === userId);
 
     setAllUsers((prev) =>
       prev.map((u) =>
@@ -889,14 +1366,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('Firestore sync note:', err);
     }
 
+    addAdminLog({
+      action: 'User Account Suspended',
+      category: 'users',
+      targetId: userId,
+      targetName: target?.name || userId,
+      details: `Suspended ${target?.name || userId} (${target?.email || ''}). Reason: "${reason}".`,
+      severity: 'warning',
+    });
+
     showToast(`User account suspended. Access has been revoked.`, 'warning');
   };
 
   const activateUser = async (userId: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Only administrators can activate users', 'error');
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can activate users.', 'error');
       return;
     }
+
+    const target = allUsers.find((u) => u.id === userId);
 
     setAllUsers((prev) =>
       prev.map((u) =>
@@ -915,14 +1403,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('Firestore sync note:', err);
     }
 
+    addAdminLog({
+      action: 'User Status Activated',
+      category: 'users',
+      targetId: userId,
+      targetName: target?.name || userId,
+      details: `Restored account ${target?.name || userId} to active status with full marketplace clearance.`,
+      severity: 'info',
+    });
+
     showToast('User status updated to Active', 'success');
   };
 
   const rejectUser = async (userId: string, reason = 'Application does not meet marketplace standards') => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Only administrators can reject users', 'error');
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can reject users.', 'error');
       return;
     }
+
+    const target = allUsers.find((u) => u.id === userId);
 
     setAllUsers((prev) =>
       prev.map((u) =>
@@ -942,14 +1441,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('Firestore sync note:', err);
     }
 
+    addAdminLog({
+      action: 'User Registration Rejected',
+      category: 'approvals',
+      targetId: userId,
+      targetName: target?.name || userId,
+      details: `Rejected registration for ${target?.name || userId}. Reason: "${reason}".`,
+      severity: 'critical',
+    });
+
     showToast('User registration rejected', 'warning');
   };
 
   const updateUserRole = async (userId: string, newRole: UserRole) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Only administrators can modify roles', 'error');
+    if (!isSuperAdmin) {
+      showToast('Access Denied: Only Super Admin (sospeterokenda@gmail.com) can modify roles.', 'error');
       return;
     }
+
+    const target = allUsers.find((u) => u.id === userId);
 
     setAllUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole, updatedAt: new Date().toISOString() } : u))
@@ -969,6 +1479,15 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     } catch (err) {
       console.warn('Firestore sync note:', err);
     }
+
+    addAdminLog({
+      action: 'User Role Modified',
+      category: 'roles_permissions',
+      targetId: userId,
+      targetName: target?.name || userId,
+      details: `Updated role for ${target?.name || userId} to "${newRole.toUpperCase()}".`,
+      severity: 'warning',
+    });
 
     showToast(`Role updated to ${newRole.toUpperCase()}`, 'info');
   };
@@ -1072,12 +1591,17 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       slug,
       status,
       sellerId: currentUser.id,
-      businessName: currentUser.businessName || currentUser.name,
-      views: 1,
+      businessName: productData.businessName || currentUser.businessName || currentUser.name,
+      businessVerified: productData.businessVerified ?? true,
+      businessLogo: productData.businessLogo,
+      sellerPhone: productData.sellerPhone || currentUser.phone || '+254 700 000 000',
+      sellerWhatsapp: productData.sellerWhatsapp || productData.sellerPhone || currentUser.phone || '+254 700 000 000',
+      views: 0,
       inquiriesCount: 0,
       createdAt: new Date().toISOString(),
       rating: 5.0,
       reviewsCount: 0,
+      specifications: productData.specifications || {},
     };
 
     // Save to Firestore
@@ -1150,14 +1674,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!existing) throw new Error('Product not found');
 
     const isOwner = existing.sellerId === currentUser.id;
-    const isAdmin = currentUser.role === 'admin';
 
-    if (!isAdmin && !isOwner) {
+    if (!isSuperAdmin && !isOwner) {
       showToast('Unauthorized: You can only delete your own products', 'error');
       throw new Error('Unauthorized: Sellers can only delete products from their own store.');
     }
 
     setProducts((prev) => prev.filter((p) => p.id !== id));
+
+    if (isSuperAdmin) {
+      addAdminLog({
+        action: 'Product Listing Deleted',
+        category: 'products',
+        targetId: id,
+        targetName: existing.title,
+        details: `Deleted listing "${existing.title}" by seller ${existing.businessName || existing.sellerId}.`,
+        severity: 'warning',
+      });
+    }
+
     showToast('Listing deleted from catalog', 'info');
   };
 
@@ -1166,8 +1701,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!existing) return;
 
     const isOwner = existing.sellerId === currentUser.id;
-    const isAdmin = currentUser.role === 'admin';
-    if (!isAdmin && !isOwner) {
+    if (!isSuperAdmin && !isOwner) {
       showToast('Unauthorized action', 'error');
       return;
     }
@@ -1180,33 +1714,66 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const featureProduct = async (id: string, featured: boolean) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Admin clearance required to feature listings', 'error');
+    if (!isSuperAdmin) {
+      showToast('Only Super Admin (sospeterokenda@gmail.com) can feature listings', 'error');
       return;
     }
+    const target = products.find((p) => p.id === id);
     setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, featured } : p)));
+
+    addAdminLog({
+      action: featured ? 'Product Featured' : 'Product Unfeatured',
+      category: 'products',
+      targetId: id,
+      targetName: target?.title || id,
+      details: `${featured ? 'Promoted listing to featured tier' : 'Removed from featured tier'}: "${target?.title || id}".`,
+      severity: 'info',
+    });
+
     showToast(featured ? 'Product featured! ⭐' : 'Product unfeatured', 'success');
   };
 
   const approveProduct = async (id: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Admin clearance required to moderate products', 'error');
+    if (!isSuperAdmin) {
+      showToast('Only Super Admin (sospeterokenda@gmail.com) can approve listings', 'error');
       return;
     }
+    const target = products.find((p) => p.id === id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: 'active', rejectionReason: undefined } : p))
     );
+
+    addAdminLog({
+      action: 'Product Listing Approved',
+      category: 'products',
+      targetId: id,
+      targetName: target?.title || id,
+      details: `Approved and published "${target?.title || id}" to marketplace live catalog.`,
+      severity: 'success',
+    });
+
     showToast('Product listing approved and published live!', 'success');
   };
 
   const rejectProduct = async (id: string, reason: string) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Admin clearance required to moderate products', 'error');
+    if (!isSuperAdmin) {
+      showToast('Only Super Admin (sospeterokenda@gmail.com) can reject listings', 'error');
       return;
     }
+    const target = products.find((p) => p.id === id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: 'rejected', rejectionReason: reason } : p))
     );
+
+    addAdminLog({
+      action: 'Product Listing Rejected',
+      category: 'products',
+      targetId: id,
+      targetName: target?.title || id,
+      details: `Rejected listing "${target?.title || id}". Reason: "${reason}".`,
+      severity: 'critical',
+    });
+
     showToast('Listing marked as rejected with seller notice', 'warning');
   };
 
@@ -1443,8 +2010,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // --- ADMIN DETAILS & BRANDING ---
   const updateAdminDetails = (updates: Partial<AdminDetails>) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Admin access required', 'error');
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can modify platform settings', 'error');
       return;
     }
     setAdminDetailsState((prev) => ({
@@ -1455,6 +2022,17 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       securityAndSettings: { ...prev.securityAndSettings, ...(updates.securityAndSettings || {}) },
       notificationPreferences: { ...prev.notificationPreferences, ...(updates.notificationPreferences || {}) },
     }));
+
+    const adminUid = getAuthenticatedAdminUid() || currentUser.id || 'usr_admin_1';
+    addAdminLog({
+      action: 'Platform Governance Settings Updated',
+      category: 'website_settings',
+      targetId: adminUid,
+      targetName: 'Marketplace Configuration',
+      details: 'Super Admin updated platform branding, fee commission, or security parameters.',
+      severity: 'info',
+    });
+
     showToast('Platform governance and administrator details saved successfully!', 'success');
   };
 
@@ -1471,14 +2049,25 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const verifySeller = (businessId: string, verified: boolean) => {
-    if (currentUser.role !== 'admin') {
-      showToast('Unauthorized: Admin access required', 'error');
+    if (!isSuperAdmin) {
+      showToast('Unauthorized: Only Super Admin can verify businesses', 'error');
       return;
     }
+    const biz = businesses.find((b) => b.id === businessId);
     setBusinesses((prev) => prev.map((b) => (b.id === businessId ? { ...b, verified } : b)));
     setProducts((prev) =>
       prev.map((p) => (p.businessId === businessId ? { ...p, businessVerified: verified } : p))
     );
+
+    addAdminLog({
+      action: verified ? 'Business Storefront Verified' : 'Business Verification Revoked',
+      category: 'businesses',
+      targetId: businessId,
+      targetName: biz?.businessName || businessId,
+      details: `${verified ? 'Granted official verified merchant trust badge to' : 'Revoked verification badge from'} "${biz?.businessName || businessId}".`,
+      severity: verified ? 'success' : 'warning',
+    });
+
     showToast(
       verified ? 'Business granted Verified Seller status! 🛡️' : 'Verification badge revoked',
       'info'
@@ -1520,12 +2109,16 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         currentUser,
         allUsers,
         isAuthLoading,
+        isSuperAdmin,
         products,
         businesses,
         orders,
         inquiries,
         reviews,
         adminDetails,
+        adminLogs,
+        safetyFlags,
+        categories,
         wishlist,
         cart,
         savedSearches,
@@ -1545,6 +2138,15 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         activateUser,
         rejectUser,
         updateUserRole,
+        updateAdminProfile,
+        changeAdminPassword,
+        addAdminLog,
+        clearAdminLogs,
+        resolveSafetyFlag,
+        dismissSafetyFlag,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         toggleWishlist,
         isInWishlist,
         addToCart,

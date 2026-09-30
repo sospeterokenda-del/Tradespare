@@ -19,7 +19,7 @@ import { SellerDashboard } from './pages/SellerDashboard';
 import { BusinessProfile, Product } from './types';
 
 function MainApp() {
-  const { products, businesses, clearCart, currentUser } = useMarketplace();
+  const { products, businesses, clearCart, currentUser, isSuperAdmin } = useMarketplace();
 
   // Navigation state
   const [currentView, setCurrentView] = useState<string>('home');
@@ -317,25 +317,25 @@ function MainApp() {
           )
         )}
 
-        {/* Admin Dashboard (STRICTLY PROTECTED: Administrator Only) */}
+        {/* Admin Dashboard (STRICTLY PROTECTED: Super Administrator Only) */}
         {currentView === 'admin-dashboard' && (
           isGuest ? (
             <AccessDenied
               reason="not_authenticated"
-              requiredRole="admin"
+              requiredRole="super_admin"
               onNavigate={handleNavigate}
               onOpenAuth={() => {
-                setAuthExplanation('Platform Governance Center requires Administrator credentials.');
+                setAuthExplanation('Super Admin Mode strictly requires signing in as sospeterokenda@gmail.com.');
                 setIsAuthModalOpen(true);
               }}
             />
-          ) : !isAdmin ? (
+          ) : !isSuperAdmin ? (
             <AccessDenied
               reason="role_restricted"
-              requiredRole="admin"
+              requiredRole="Super Admin (sospeterokenda@gmail.com)"
               onNavigate={handleNavigate}
               onOpenAuth={() => {
-                setAuthExplanation('Clearance denied: Administrator privileges required.');
+                setAuthExplanation('Access Denied: Only the verified Super Admin (sospeterokenda@gmail.com) can enter Super Admin Mode.');
                 setIsAuthModalOpen(true);
               }}
             />
