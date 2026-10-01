@@ -24,7 +24,7 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate, onCategorySelect }) => {
-  const { adminDetails } = useMarketplace();
+  const { adminDetails, isSuperAdmin } = useMarketplace();
 
   return (
     <footer className="bg-slate-900 text-slate-300 pt-16 pb-12 border-t border-slate-800">
@@ -157,14 +157,16 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onCategorySelect }) 
 
           {/* Platform & Governance */}
           <div>
-            <h5 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Trust & Admin</h5>
+            <h5 className="text-white font-bold text-sm mb-4 tracking-wide uppercase">Trust & Support</h5>
             <ul className="space-y-2.5 text-xs">
-              <li>
-                <button onClick={() => onNavigate('admin-dashboard')} className="hover:text-white transition-colors flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                  Admin Governance Portal
-                </button>
-              </li>
+              {isSuperAdmin && (
+                <li>
+                  <button onClick={() => onNavigate('admin-dashboard')} className="hover:text-white transition-colors flex items-center gap-1.5 text-rose-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                    Admin Governance Portal
+                  </button>
+                </li>
+              )}
               <li>
                 <button onClick={() => onNavigate('customer-dashboard', { tab: 'orders' })} className="hover:text-white transition-colors">
                   Track My Orders

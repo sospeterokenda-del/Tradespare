@@ -952,11 +952,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </p>
 
             <div className="space-y-2">
-              {[...allUsers].sort((a, b) => (a.role === 'admin' ? -1 : b.role === 'admin' ? 1 : 0)).slice(0, 5).map((u) => {
-                let badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-                if (u.role === 'admin') badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                else if (u.role === 'seller' && u.status === 'active') badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                else if (u.status === 'pending') badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+              {[...allUsers]
+                .filter((u) => u.role !== 'admin' && u.email.toLowerCase() !== 'sospeterokenda@gmail.com')
+                .slice(0, 4)
+                .map((u) => {
+                  let badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                  if (u.role === 'seller' && u.status === 'active') badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  else if (u.status === 'pending') badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
 
                 return (
                   <button

@@ -864,11 +864,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {[...allUsers].sort((a, b) => (a.role === 'admin' ? -1 : b.role === 'admin' ? 1 : 0)).map((u) => {
-                let badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-                if (u.role === 'admin') badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
-                else if (u.role === 'seller' && u.status === 'active') badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                else if (u.status === 'pending') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+              {[...allUsers]
+                .filter((u) => u.role !== 'admin' && u.email.toLowerCase() !== 'sospeterokenda@gmail.com')
+                .slice(0, 4)
+                .map((u) => {
+                  let badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+                  if (u.role === 'seller' && u.status === 'active') badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                  else if (u.status === 'pending') badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
 
                 return (
                   <button

@@ -1534,9 +1534,15 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const target = allUsers.find((u) => u.id === userId);
     if (!target) return;
 
+    // Super Admin access strictly requires real authentication (never simulated in demo)
+    if (target.role === 'admin' || target.email.toLowerCase() === SUPER_ADMIN_EMAIL) {
+      showToast('Super Admin access is restricted to real authentication.', 'error');
+      return;
+    }
+
     setCurrentUserId(target.id);
     showToast(
-      `Switched to verified identity: ${target.name} [Role: ${target.role.toUpperCase()}]`,
+      `Switched to demo identity: ${target.name} [Role: ${target.role.toUpperCase()}]`,
       'info'
     );
   };
