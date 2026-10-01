@@ -47,11 +47,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     requestPasswordResetCode,
     resetPassword,
     fastSwitchUser,
+    runDemoAuthCheck,
     allUsers,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'recovery'>(defaultTab);
   const [selectedRole, setSelectedRole] = useState<'buyer' | 'seller'>('buyer');
+
+  // Demo Check State
+  const [demoCheckStatus, setDemoCheckStatus] = useState<'idle' | 'checking' | 'success' | 'failed'>('idle');
+  const [demoCheckMessage, setDemoCheckMessage] = useState<string | null>(null);
+
+  const handleDemoCheck = async () => {
+    setDemoCheckStatus('checking');
+    setDemoCheckMessage(null);
+    try {
+      const res = await runDemoAuthCheck();
+      if (res.success) {
+        setDemoCheckStatus('success');
+        setDemoCheckMessage('Demo login successful');
+      } else {
+        setDemoCheckStatus('failed');
+        setDemoCheckMessage('Demo login failed.');
+      }
+    } catch {
+      setDemoCheckStatus('failed');
+      setDemoCheckMessage('Demo login failed.');
+    }
+  };
 
   // Login inputs
   const [email, setEmail] = useState('');
@@ -258,10 +281,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const autofillDemo = (userEmail: string, userPass = 'Password123!') => {
+  const autofillDemo = (userEmail: string) => {
     setActiveTab('login');
     setEmail(userEmail);
-    setPassword(userPass);
+    setPassword('');
     setErrorMsg(null);
     setInfoMsg(null);
   };
@@ -778,17 +801,50 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
+          {/* SECURE DEMO CHECK FEATURE */}
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700">
+                  Demo Check (Authentication Test)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleDemoCheck}
+                disabled={demoCheckStatus === 'checking'}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-[10px] rounded-lg transition active:scale-98"
+              >
+                {demoCheckStatus === 'checking' ? 'Checking...' : 'Run Demo Check'}
+              </button>
+            </div>
+
+            {/* Display ONLY "Demo login successful" or "Demo login failed." */}
+            {demoCheckMessage && (
+              <div
+                className={`py-1.5 px-3 rounded-xl text-xs font-extrabold text-center border animate-in fade-in duration-150 ${
+                  demoCheckStatus === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                }`}
+              >
+                {demoCheckMessage}
+              </div>
+            )}
+          </div>
+
           {/* Quick Credential Helpers */}
           <div className="pt-3 border-t border-slate-200">
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-                1-Click Demo Accounts (Fast Testing)
+                1-Click Select Email (Passwords Not Prefilled)
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {allUsers.map((u) => {
+              {[...allUsers].sort((a, b) => (a.role === 'admin' ? -1 : b.role === 'admin' ? 1 : 0)).map((u) => {
                 let badgeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200';
                 if (u.role === 'admin') badgeColor = 'bg-rose-50 text-rose-700 border-rose-200';
                 else if (u.role === 'seller' && u.status === 'active') badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -798,7 +854,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => autofillDemo(u.email, u.password || 'Password123!')}
+                    onClick={() => autofillDemo(u.email)}
                     className="p-2 bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 rounded-xl text-left transition flex items-center gap-2 group min-h-[44px]"
                   >
                     <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover border border-slate-300 flex-shrink-0" />

@@ -2028,7 +2028,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     {showCurrentPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-0.5">Seeded password: Password123!</p>
               </div>
 
               <div>

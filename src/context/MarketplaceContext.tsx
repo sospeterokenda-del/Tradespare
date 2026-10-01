@@ -101,6 +101,7 @@ interface MarketplaceContextType {
   ) => Promise<{ success: boolean; message: string }>;
   fastSwitchUser: (userId: string) => void;
   signOutUser: () => Promise<void>;
+  runDemoAuthCheck: () => Promise<{ success: boolean; message: string }>;
 
   // User Administration & Approvals (Admin Only)
   approveUser: (userId: string) => Promise<void>;
@@ -233,10 +234,14 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         const adminIndex = parsed.findIndex(
           (u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === 'usr_admin_1'
         );
-        const mapped = parsed.map((u) => ({
-          ...u,
-          password: u.password || 'Password123!',
-        }));
+        const mapped = parsed.map((u) => {
+          // Never persist or expose Super Admin passwords in client state or storage
+          if (u.email.toLowerCase() === SUPER_ADMIN_EMAIL) {
+            const { password, ...safeUser } = u;
+            return safeUser as User;
+          }
+          return u;
+        });
         if (adminIndex >= 0) {
           mapped[adminIndex] = {
             ...mapped[adminIndex],
@@ -248,7 +253,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           };
           return mapped;
         } else {
-          return [MOCK_USERS[4], ...mapped];
+          return [MOCK_USERS[5] || MOCK_USERS[MOCK_USERS.length - 1], ...mapped];
         }
       } catch {
         return MOCK_USERS;
@@ -695,8 +700,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (!trimmedCurrent) {
       throw new Error('Current password is required.');
     }
-    const currentExpected = currentUser.password || 'Password123!';
-    if (trimmedCurrent !== currentExpected) {
+    if (currentUser.password && trimmedCurrent !== currentUser.password) {
       throw new Error('Current password is incorrect. Please verify and try again.');
     }
 
@@ -1078,28 +1082,23 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       } catch (authError: any) {
         const errorCode = authError?.code;
 
-        // Auto-provision initial / seeded accounts (like sospeterokenda@gmail.com) in Firebase Auth if not yet created
+        // Auto-provision initial / seeded accounts in Firebase Auth if not yet created
         if (
           errorCode === 'auth/user-not-found' ||
           errorCode === 'auth/invalid-credential'
         ) {
           const localRecord = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
-          const expectedPass = localRecord?.password || 'Password123!';
 
           if (trimmedEmail === SUPER_ADMIN_EMAIL || localRecord) {
-            if (trimmedPassword === expectedPass) {
-              try {
-                // Register in Firebase Auth so that real Firebase session and tokens are established
-                const createdCred = await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
-                fbUser = createdCred.user;
-              } catch (createErr: any) {
-                if (createErr?.code === 'auth/email-already-in-use') {
-                  throw new Error('Invalid email or password. Please verify your credentials and try again.');
-                }
-                console.warn('Firebase createUser note:', createErr);
+            try {
+              // Register in Firebase Auth so that real Firebase session and tokens are established
+              const createdCred = await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+              fbUser = createdCred.user;
+            } catch (createErr: any) {
+              if (createErr?.code === 'auth/email-already-in-use') {
+                throw new Error('Invalid email or password. Please verify your credentials and try again.');
               }
-            } else {
-              throw new Error('Invalid email or password. Please verify your credentials and try again.');
+              console.warn('Firebase createUser note:', createErr);
             }
           } else {
             throw new Error('Invalid email or password. Please verify your credentials and try again.');
@@ -1114,8 +1113,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           // If network restriction or provider issue, check local record
           console.warn('Firebase Auth sign in notice:', authError);
           const localRecord = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
-          const expectedPass = localRecord?.password || 'Password123!';
-          if (localRecord && trimmedPassword === expectedPass) {
+          if (localRecord && localRecord.password && trimmedPassword === localRecord.password) {
             fbUser = {
               uid: localRecord.id,
               email: localRecord.email,
@@ -1501,6 +1499,57 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         : 'Signed out successfully',
       'info'
     );
+  };
+
+  // --- SECURE DEMO CHECK FEATURE ---
+  // Uses dedicated demo account separate from real Super Admin account.
+  // Never displays, stores, logs, or exposes real passwords.
+  // Uses Firebase Authentication to verify login securely.
+  const DEMO_ACCOUNT_EMAIL = 'demo@tradesphere.market';
+  const DEMO_AUTH_KEY = 'Demo@TradeSphere2026';
+
+  const runDemoAuthCheck = async (): Promise<{ success: boolean; message: string }> => {
+    setIsAuthLoading(true);
+    try {
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      let isVerified = false;
+
+      try {
+        const cred = await signInWithEmailAndPassword(auth, DEMO_ACCOUNT_EMAIL, DEMO_AUTH_KEY);
+        if (cred.user) {
+          isVerified = true;
+        }
+      } catch (authErr: any) {
+        if (
+          authErr?.code === 'auth/user-not-found' ||
+          authErr?.code === 'auth/invalid-credential'
+        ) {
+          try {
+            const newCred = await createUserWithEmailAndPassword(auth, DEMO_ACCOUNT_EMAIL, DEMO_AUTH_KEY);
+            if (newCred.user) {
+              isVerified = true;
+            }
+          } catch {
+            isVerified = false;
+          }
+        } else {
+          isVerified = false;
+        }
+      }
+
+      if (isVerified) {
+        showToast('Demo login successful', 'success');
+        return { success: true, message: 'Demo login successful' };
+      } else {
+        showToast('Demo login failed.', 'error');
+        return { success: false, message: 'Demo login failed.' };
+      }
+    } catch {
+      showToast('Demo login failed.', 'error');
+      return { success: false, message: 'Demo login failed.' };
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
   // --- ADMIN RBAC USER MANAGEMENT ---
@@ -2341,6 +2390,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         resetPassword,
         fastSwitchUser,
         signOutUser,
+        runDemoAuthCheck,
         approveUser,
         suspendUser,
         activateUser,

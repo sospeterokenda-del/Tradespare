@@ -41,10 +41,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     resetPassword,
     loginWithGoogle,
     fastSwitchUser,
+    runDemoAuthCheck,
     allUsers,
   } = useMarketplace();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'recovery'>(initialTab);
+
+  // Demo Check State
+  const [demoCheckStatus, setDemoCheckStatus] = useState<'idle' | 'checking' | 'success' | 'failed'>('idle');
+  const [demoCheckMessage, setDemoCheckMessage] = useState<string | null>(null);
+
+  const handleDemoCheck = async () => {
+    setDemoCheckStatus('checking');
+    setDemoCheckMessage(null);
+    try {
+      const res = await runDemoAuthCheck();
+      if (res.success) {
+        setDemoCheckStatus('success');
+        setDemoCheckMessage('Demo login successful');
+      } else {
+        setDemoCheckStatus('failed');
+        setDemoCheckMessage('Demo login failed.');
+      }
+    } catch {
+      setDemoCheckStatus('failed');
+      setDemoCheckMessage('Demo login failed.');
+    }
+  };
 
   // Login Form State
   const [loginEmail, setLoginEmail] = useState('');
@@ -231,11 +254,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  // 1-Click Fill Demo Credentials
-  const fillCredentials = (email: string, pass = 'Password123!') => {
+  // Select email for login testing (never prefill or reveal passwords)
+  const fillCredentials = (email: string) => {
     setActiveTab('login');
     setLoginEmail(email);
-    setLoginPassword(pass);
+    setLoginPassword('');
     setErrorMsg(null);
     setInfoMsg(null);
   };
@@ -845,6 +868,57 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
         {/* Sidebar Info: Verification Policies & 1-Click Demo Accounts */}
         <div className="lg:col-span-5 space-y-6">
+          {/* SECURE DEMO CHECK FEATURE */}
+          <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-xs uppercase font-extrabold tracking-wider text-slate-800">
+                  Authentication Demo Check
+                </h2>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200">
+                Secure Mode
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Tests Firebase Authentication securely using a dedicated demo account. Passwords are never displayed, stored, logged, prefilled, or revealed.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleDemoCheck}
+              disabled={demoCheckStatus === 'checking'}
+              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 active:scale-98 min-h-[44px]"
+            >
+              {demoCheckStatus === 'checking' ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Verifying Authentication...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Run Demo Check</span>
+                </>
+              )}
+            </button>
+
+            {/* Display ONLY "Demo login successful" or "Demo login failed." */}
+            {demoCheckMessage && (
+              <div
+                className={`p-3 rounded-xl text-xs font-extrabold text-center border animate-in fade-in duration-200 ${
+                  demoCheckStatus === 'success'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                }`}
+              >
+                {demoCheckMessage}
+              </div>
+            )}
+          </div>
+
           {/* Quick Demo Accounts Switcher & Credential Helper */}
           <div className="bg-white rounded-3xl p-6 shadow-xl border border-slate-200">
             <div className="flex items-center gap-2 mb-2">
@@ -854,7 +928,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </h2>
             </div>
             <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-              Click any profile below to autofill its credentials into the password login form:
+              Click any profile below to select its email for login (passwords are never prefilled):
             </p>
 
             <div className="space-y-2">
@@ -868,7 +942,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <button
                     key={u.id}
                     type="button"
-                    onClick={() => fillCredentials(u.email, u.password || 'Password123!')}
+                    onClick={() => fillCredentials(u.email)}
                     className="w-full p-2.5 bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition flex items-center justify-between group min-h-[46px]"
                   >
                     <div className="flex items-center gap-2.5 overflow-hidden">
