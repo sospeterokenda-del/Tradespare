@@ -1,13 +1,46 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut as firebaseSignOut,
+  updatePassword,
+  updateProfile,
+} from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-// Initialize Firebase
+// Initialize Firebase with configured credentials
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
+
+export {
+  updatePassword,
+  updateProfile,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  firebaseSignOut,
+};
+
+// Explicitly set browserLocalPersistence so user sessions persist across page reloads on Netlify
+if (typeof window !== 'undefined') {
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('Firebase setPersistence notice:', err);
+  });
+}
+
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 export enum OperationType {
   CREATE = 'create',
@@ -37,11 +70,13 @@ export interface FirestoreErrorInfo {
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errMsg = error instanceof Error ? error.message : String(error);
-  // Never treat user-cancelled auth popups as fatal Firestore errors
+  // Never treat user-cancelled auth popups or domain authorization messages as fatal Firestore errors
   if (
     errMsg.includes('auth/popup-closed-by-user') ||
     errMsg.includes('auth/cancelled-popup-request') ||
-    errMsg.includes('popup-closed-by-user')
+    errMsg.includes('popup-closed-by-user') ||
+    errMsg.includes('auth/unauthorized-domain') ||
+    errMsg.includes('unauthorized-domain')
   ) {
     return;
   }

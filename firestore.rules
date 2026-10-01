@@ -27,8 +27,8 @@ service cloud.firestore {
     // Super Admin: Strictly sospeterokenda@gmail.com with verified email or stored admin record
     function isSuperAdmin() {
       return isSignedIn() && (
-        (request.auth.token.email is string && request.auth.token.email == 'sospeterokenda@gmail.com') ||
-        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.email == 'sospeterokenda@gmail.com')
+        (request.auth.token.email is string && request.auth.token.email.lower() == 'sospeterokenda@gmail.com') ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.email.lower() == 'sospeterokenda@gmail.com')
       );
     }
 

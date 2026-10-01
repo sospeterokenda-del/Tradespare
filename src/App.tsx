@@ -396,7 +396,7 @@ function MainApp() {
         onClose={() => setIsAuthModalOpen(false)}
         explanationMessage={authExplanation}
         onSuccessfulLogin={(user) => {
-          if (user.role === 'admin') {
+          if (user.role === 'admin' || user.email?.toLowerCase() === 'sospeterokenda@gmail.com') {
             handleNavigate('admin-dashboard');
           } else if (user.role === 'seller') {
             handleNavigate('seller-dashboard');

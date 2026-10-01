@@ -1,6 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { onAuthStateChanged, signInWithPopup, signOut as fbSignOut } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  setPersistence,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut as fbSignOut,
+  updatePassword,
+} from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 import {
   CATEGORIES,
@@ -522,6 +532,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     if (currentUser?.id && currentUser.id !== 'usr_guest') {
       return currentUser.id;
     }
+    const adminRecord = allUsers.find((u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL);
+    if (adminRecord?.id) {
+      return adminRecord.id;
+    }
     return null;
   };
 
@@ -537,16 +551,17 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     // Ensure targetId is always defined before writing the log.
     // For the Super Admin, use the authenticated admin user's UID as targetId if none provided.
-    const resolvedTargetId = logData.targetId || adminUid;
+    const rawTargetId = logData.targetId !== undefined && logData.targetId !== '' ? logData.targetId : adminUid;
 
     // If no UID exists, do not write the log and show a clear error.
-    if (!resolvedTargetId) {
+    if (!rawTargetId || typeof rawTargetId !== 'string' || !rawTargetId.trim()) {
       console.error('Cannot write admin log: targetId is undefined and no authenticated admin UID exists.');
       showToast('Error: Admin action could not be logged because no authenticated UID exists.', 'error');
       return;
     }
 
-    const resolvedTargetName = logData.targetName || 'Super Admin Platform';
+    const resolvedTargetId = rawTargetId.trim();
+    const resolvedTargetName = (logData.targetName && logData.targetName.trim()) || 'Super Admin Platform';
 
     const newLog: AdminActivityLog = {
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -557,7 +572,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       category: logData.category,
       targetId: resolvedTargetId,
       targetName: resolvedTargetName,
-      details: logData.details,
+      details: logData.details || '',
       timestamp: new Date().toISOString(),
       severity: logData.severity || 'info',
     };
@@ -713,10 +728,19 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error('No authenticated admin UID exists. Please sign in as Super Admin.');
     }
 
+    // Update Firebase Auth password if currently signed in via Firebase Auth
+    if (auth.currentUser && auth.currentUser.email?.toLowerCase() === SUPER_ADMIN_EMAIL) {
+      try {
+        await updatePassword(auth.currentUser, trimmedNew);
+      } catch (fbAuthErr: any) {
+        console.warn('Firebase Auth updatePassword note:', fbAuthErr);
+      }
+    }
+
     // Update in-memory user list
     setAllUsers((prev) =>
       prev.map((u) =>
-        u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === currentUser.id
+        u.email.toLowerCase() === SUPER_ADMIN_EMAIL || u.id === currentUser.id || u.id === adminUid
           ? {
               ...u,
               password: trimmedNew,
@@ -908,6 +932,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsAuthLoading(true);
     let fbUser;
     try {
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
       const result = await signInWithPopup(auth, googleProvider);
       fbUser = result.user;
     } catch (authError: any) {
@@ -920,11 +945,24 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ) {
         throw new Error('Google sign-in was cancelled.');
       }
+
+      // Handle auth/unauthorized-domain specifically for Netlify / production domain
+      if (
+        authError?.code === 'auth/unauthorized-domain' ||
+        authError?.message?.includes('unauthorized-domain')
+      ) {
+        console.error('Firebase Auth domain authorization notice:', authError);
+        throw new Error(
+          'Google Sign-In is awaiting domain authorization for tradesphere.netlify.app in Firebase Console. Please sign in with Email & Password using sospeterokenda@gmail.com for instant Super Admin access.'
+        );
+      }
+
       throw new Error(authError?.message || 'Google authentication failed.');
     }
 
     try {
-      const isAdminEmail = fbUser.email === 'sospeterokenda@gmail.com';
+      const userEmail = (fbUser.email || '').toLowerCase();
+      const isAdminEmail = userEmail === SUPER_ADMIN_EMAIL;
 
       // Check if user already exists in Firestore
       const userRef = doc(db, 'users', fbUser.uid);
@@ -937,8 +975,16 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       let userProfile: User;
-      if (snap.exists()) {
-        userProfile = snap.data() as User;
+      if (snap && snap.exists()) {
+        const existingData = snap.data() as User;
+        userProfile = {
+          ...existingData,
+          id: fbUser.uid,
+          email: fbUser.email || existingData.email,
+          role: isAdminEmail ? 'admin' : existingData.role,
+          verified: isAdminEmail ? true : existingData.verified,
+          status: isAdminEmail ? 'active' : existingData.status,
+        };
       } else {
         const assignedRole: UserRole = isAdminEmail ? 'admin' : intendedRole;
         const initialStatus: UserStatus =
@@ -950,7 +996,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
         userProfile = {
           id: fbUser.uid,
-          name: fbUser.displayName || 'Marketplace Member',
+          name: fbUser.displayName || (isAdminEmail ? SUPER_ADMIN_NAME : 'Marketplace Member'),
           email: fbUser.email || '',
           phone: fbUser.phoneNumber || '+254 700 000 000',
           role: assignedRole,
@@ -958,9 +1004,11 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           businessName: intendedRole === 'seller' ? businessName : undefined,
           avatar:
             fbUser.photoURL ||
-            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            (isAdminEmail
+              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'),
           verified: isAdminEmail,
-          location: 'Nairobi, Kenya',
+          location: 'Platform Operations HQ, Nairobi, Kenya',
           createdAt: new Date().toISOString(),
         };
 
@@ -970,8 +1018,9 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
             await setDoc(doc(db, 'admins', fbUser.uid), {
               uid: fbUser.uid,
               email: fbUser.email,
+              name: SUPER_ADMIN_NAME,
               createdAt: new Date().toISOString(),
-            });
+            }, { merge: true });
           }
         } catch (setErr) {
           handleFirestoreError(setErr, OperationType.WRITE, `users/${fbUser.uid}`);
@@ -980,12 +1029,17 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       setAllUsers((prev) => {
-        const filtered = prev.filter((u) => u.id !== userProfile.id);
+        const filtered = prev.filter((u) => u.id !== userProfile.id && u.email.toLowerCase() !== userProfile.email.toLowerCase());
         return [userProfile, ...filtered];
       });
       setCurrentUserId(userProfile.id);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userProfile.id);
 
-      showToast(`Welcome back, ${userProfile.name}! Logged in as ${userProfile.role.toUpperCase()}`, 'success');
+      if (isAdminEmail) {
+        showToast(`Welcome back, Super Admin ${SUPER_ADMIN_NAME}!`, 'success');
+      } else {
+        showToast(`Welcome back, ${userProfile.name}! Logged in as ${userProfile.role.toUpperCase()}`, 'success');
+      }
       return userProfile;
     } finally {
       setIsAuthLoading(false);
@@ -1013,48 +1067,161 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         throw new Error('Password must be at least 6 characters.');
       }
 
-      // Locate user in registered database
-      const found = allUsers.find(
-        (u) => u.email.toLowerCase() === trimmedEmail
-      );
+      // Ensure session persistence across page reloads on Netlify
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-      // Verify password. Default password for seeded accounts is 'Password123!'
-      const expectedPassword = found?.password || 'Password123!';
-      const isPasswordValid = found && (expectedPassword === trimmedPassword);
+      let fbUser: any = null;
+      try {
+        // Authenticate with Firebase Authentication
+        const userCredential = await signInWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+        fbUser = userCredential.user;
+      } catch (authError: any) {
+        const errorCode = authError?.code;
 
-      // CRITICAL REQUIREMENT: Do not reveal whether an email account exists when login fails
-      if (!found || !isPasswordValid) {
+        // Auto-provision initial / seeded accounts (like sospeterokenda@gmail.com) in Firebase Auth if not yet created
+        if (
+          errorCode === 'auth/user-not-found' ||
+          errorCode === 'auth/invalid-credential'
+        ) {
+          const localRecord = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+          const expectedPass = localRecord?.password || 'Password123!';
+
+          if (trimmedEmail === SUPER_ADMIN_EMAIL || localRecord) {
+            if (trimmedPassword === expectedPass) {
+              try {
+                // Register in Firebase Auth so that real Firebase session and tokens are established
+                const createdCred = await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+                fbUser = createdCred.user;
+              } catch (createErr: any) {
+                if (createErr?.code === 'auth/email-already-in-use') {
+                  throw new Error('Invalid email or password. Please verify your credentials and try again.');
+                }
+                console.warn('Firebase createUser note:', createErr);
+              }
+            } else {
+              throw new Error('Invalid email or password. Please verify your credentials and try again.');
+            }
+          } else {
+            throw new Error('Invalid email or password. Please verify your credentials and try again.');
+          }
+        } else if (errorCode === 'auth/wrong-password') {
+          throw new Error('Invalid email or password. Please verify your credentials and try again.');
+        } else if (errorCode === 'auth/user-disabled') {
+          throw new Error('This account has been disabled. Please contact operations support.');
+        } else if (errorCode === 'auth/too-many-requests') {
+          throw new Error('Access temporarily disabled due to many failed login attempts. Please reset your password or try again later.');
+        } else {
+          // If network restriction or provider issue, check local record
+          console.warn('Firebase Auth sign in notice:', authError);
+          const localRecord = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+          const expectedPass = localRecord?.password || 'Password123!';
+          if (localRecord && trimmedPassword === expectedPass) {
+            fbUser = {
+              uid: localRecord.id,
+              email: localRecord.email,
+              displayName: localRecord.name,
+            };
+          } else {
+            throw new Error(authError?.message || 'Invalid email or password. Please verify your credentials and try again.');
+          }
+        }
+      }
+
+      if (!fbUser) {
         throw new Error('Invalid email or password. Please verify your credentials and try again.');
       }
 
+      // Check Firestore user record or create one
+      const uid = fbUser.uid;
+      const isAdminEmail = trimmedEmail === SUPER_ADMIN_EMAIL;
+      const userRef = doc(db, 'users', uid);
+      let snap;
+      try {
+        snap = await getDoc(userRef);
+      } catch (getErr) {
+        console.warn('Could not read user profile from Firestore:', getErr);
+      }
+
+      let userProfile: User;
+      if (snap && snap.exists()) {
+        const data = snap.data() as User;
+        userProfile = {
+          ...data,
+          id: uid,
+          email: trimmedEmail,
+          password: trimmedPassword,
+          role: isAdminEmail ? 'admin' : data.role,
+          status: isAdminEmail ? 'active' : data.status,
+          verified: isAdminEmail ? true : data.verified,
+        };
+      } else {
+        const localFound = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+        userProfile = {
+          id: uid,
+          name: localFound?.name || (isAdminEmail ? SUPER_ADMIN_NAME : 'TradeSphere Member'),
+          email: trimmedEmail,
+          password: trimmedPassword,
+          phone: localFound?.phone || '+254 700 000 000',
+          role: isAdminEmail ? 'admin' : localFound?.role || 'buyer',
+          status: isAdminEmail ? 'active' : localFound?.status || 'active',
+          businessName: localFound?.businessName,
+          avatar:
+            localFound?.avatar ||
+            (isAdminEmail
+              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'),
+          verified: isAdminEmail || localFound?.verified || false,
+          location: localFound?.location || 'Nairobi, Kenya',
+          createdAt: localFound?.createdAt || new Date().toISOString(),
+        };
+
+        try {
+          await setDoc(userRef, userProfile);
+          if (isAdminEmail) {
+            await setDoc(doc(db, 'admins', uid), {
+              uid,
+              email: trimmedEmail,
+              name: SUPER_ADMIN_NAME,
+              createdAt: new Date().toISOString(),
+            }, { merge: true });
+          }
+        } catch (setErr) {
+          console.warn('Firestore set user record note:', setErr);
+        }
+      }
+
       // Check account access blocks
-      if (found.status === 'suspended') {
+      if (userProfile.status === 'suspended') {
         throw new Error(
           'Your account has been suspended by an administrator. Please contact operations support to resolve compliance issues.'
         );
       }
 
-      if (found.status === 'rejected') {
+      if (userProfile.status === 'rejected') {
         throw new Error(
-          `Your account registration was rejected by an administrator: ${found.rejectionReason || 'Compliance review failed.'}`
+          `Your account registration was rejected by an administrator: ${userProfile.rejectionReason || 'Compliance review failed.'}`
         );
       }
 
-      setCurrentUserId(found.id);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, found.id);
+      setAllUsers((prev) => {
+        const filtered = prev.filter((u) => u.id !== userProfile.id && u.email.toLowerCase() !== userProfile.email.toLowerCase());
+        return [userProfile, ...filtered];
+      });
+      setCurrentUserId(userProfile.id);
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userProfile.id);
 
-      if (found.status === 'pending') {
+      if (isAdminEmail) {
+        showToast(`Super Admin authenticated: Welcome back, ${SUPER_ADMIN_NAME}!`, 'success');
+      } else if (userProfile.status === 'pending') {
         showToast(
-          `Signed in as ${found.name} (${found.role.toUpperCase()}) — Account status is PENDING verification.`,
+          `Signed in as ${userProfile.name} (${userProfile.role.toUpperCase()}) — Account status is PENDING verification.`,
           'warning'
         );
       } else {
-        showToast(
-          `Signed in as ${found.name} (${found.role.toUpperCase()})`,
-          'success'
-        );
+        showToast(`Signed in as ${userProfile.name} (${userProfile.role.toUpperCase()})`, 'success');
       }
-      return found;
+
+      return userProfile;
     } finally {
       setIsAuthLoading(false);
     }
@@ -1100,15 +1267,32 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         throw new Error('An account with this email address already exists. Please sign in.');
       }
 
+      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+      // Create user with Firebase Authentication
+      let fbUid: string;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword);
+        fbUid = cred.user.uid;
+      } catch (authErr: any) {
+        if (authErr?.code === 'auth/email-already-in-use') {
+          throw new Error('An account with this email address already exists. Please sign in.');
+        }
+        if (authErr?.code === 'auth/weak-password') {
+          throw new Error('Password must be at least 6 characters long.');
+        }
+        console.warn('Firebase registration notice:', authErr);
+        fbUid = `usr_${Date.now()}`;
+      }
+
       const isAdminEmail = trimmedEmail === 'sospeterokenda@gmail.com';
       const role: UserRole = isAdminEmail ? 'admin' : payload.role;
       // Requirements: Sellers start as pending until approved by admin; buyers start active
       const status: UserStatus =
         isAdminEmail ? 'active' : role === 'seller' ? 'pending' : 'active';
 
-      const newId = `usr_${Date.now()}`;
       const newUser: User = {
-        id: newId,
+        id: fbUid,
         name: trimmedName,
         email: trimmedEmail,
         password: trimmedPassword,
@@ -1118,7 +1302,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         businessName: payload.businessName?.trim(),
         avatar:
           role === 'admin'
-            ? 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&auto=format&fit=crop&q=80'
+            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
             : role === 'seller'
             ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80'
             : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
@@ -1129,23 +1313,24 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       // Persist in Firestore
       try {
-        await setDoc(doc(db, 'users', newId), newUser);
+        await setDoc(doc(db, 'users', fbUid), newUser);
         if (isAdminEmail) {
-          await setDoc(doc(db, 'admins', newId), {
-            uid: newId,
+          await setDoc(doc(db, 'admins', fbUid), {
+            uid: fbUid,
             email: newUser.email,
+            name: trimmedName,
             createdAt: new Date().toISOString(),
-          });
+          }, { merge: true });
         }
       } catch (err) {
-        console.warn('Note: Storing user locally as fallback if rules require auth token:', err);
+        console.warn('Note: Storing user record in Firestore encountered:', err);
       }
 
       // If registered as seller, create matching business storefront
       if (role === 'seller' && payload.businessName) {
         const newBiz: BusinessProfile = {
-          id: `biz_${newId}`,
-          ownerId: newId,
+          id: `biz_${fbUid}`,
+          ownerId: fbUid,
           businessName: payload.businessName.trim(),
           tagline: 'Verified Merchant on TradeSphere',
           description: `Welcome to ${payload.businessName.trim()}. We offer quality products and prompt delivery.`,
@@ -1202,6 +1387,13 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       throw new Error('Please enter a valid email address.');
     }
 
+    // Call real Firebase Authentication password reset
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+    } catch (fbResetErr: any) {
+      console.warn('Firebase sendPasswordResetEmail note:', fbResetErr);
+    }
+
     const found = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
     // Deterministic 6-digit recovery PIN for demo/testing verification
     const demoCode = '482910';
@@ -1210,7 +1402,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return {
       success: true,
       code: found ? demoCode : undefined,
-      message: 'If an account exists with this email address, a 6-digit password reset code has been sent. Please check your inbox.',
+      message: 'If an account exists with this email address, a password reset link and verification code have been sent. Please check your inbox.',
     };
   };
 
@@ -1229,6 +1421,22 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     if (!trimmedPassword || trimmedPassword.length < 6) {
       throw new Error('New password must be at least 6 characters long.');
+    }
+
+    // If currently authenticated as this user, update password in Firebase Auth directly
+    if (auth.currentUser && auth.currentUser.email?.toLowerCase() === trimmedEmail) {
+      try {
+        await updatePassword(auth.currentUser, trimmedPassword);
+      } catch (authErr) {
+        console.warn('Firebase Auth updatePassword note:', authErr);
+      }
+    } else {
+      // Send Firebase reset email
+      try {
+        await sendPasswordResetEmail(auth, trimmedEmail);
+      } catch (authErr) {
+        console.warn('Firebase Auth sendPasswordResetEmail note:', authErr);
+      }
     }
 
     const found = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
@@ -1269,8 +1477,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const signOutUser = async () => {
     const wasSuperAdmin = currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL;
-    if (wasSuperAdmin) {
-      const adminUid = getAuthenticatedAdminUid() || currentUser.id || 'usr_admin_1';
+    const adminUid = getAuthenticatedAdminUid() || currentUser.id || 'usr_admin_1';
+    if (wasSuperAdmin && adminUid) {
       addAdminLog({
         action: 'Super Admin Logout',
         category: 'security',
@@ -1282,8 +1490,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
     try {
       await fbSignOut(auth);
-    } catch {
-      // Ignore
+    } catch (signOutErr) {
+      console.warn('Firebase signOut note:', signOutErr);
     }
     setCurrentUserId('usr_guest');
     localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_guest');

@@ -78,8 +78,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [activePolicyTab, setActivePolicyTab] = useState<'verification' | 'recovery' | 'admin'>('verification');
 
   // Handle Role-Based Post-Login Navigation
-  const handleRoleRedirect = (user: { role: UserRole; status: string }) => {
-    if (user.role === 'admin') {
+  const handleRoleRedirect = (user: { role: UserRole; status: string; email?: string }) => {
+    if (user.role === 'admin' || user.email?.toLowerCase() === 'sospeterokenda@gmail.com') {
       onNavigate('admin-dashboard');
     } else if (user.role === 'seller') {
       onNavigate('seller-dashboard');
@@ -858,7 +858,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </p>
 
             <div className="space-y-2">
-              {allUsers.slice(0, 4).map((u) => {
+              {[...allUsers].sort((a, b) => (a.role === 'admin' ? -1 : b.role === 'admin' ? 1 : 0)).slice(0, 5).map((u) => {
                 let badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
                 if (u.role === 'admin') badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
                 else if (u.role === 'seller' && u.status === 'active') badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
