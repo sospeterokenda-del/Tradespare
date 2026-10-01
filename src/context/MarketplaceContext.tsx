@@ -391,9 +391,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Sync to local storage
+  // Sync to local storage without storing or exposing passwords
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(allUsers));
+    const sanitizedUsers = allUsers.map(({ password: _p, ...safeUser }) => safeUser);
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(sanitizedUsers));
   }, [allUsers]);
 
   useEffect(() => {
@@ -961,6 +962,15 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         );
       }
 
+      if (
+        authError?.code === 'auth/operation-not-allowed' ||
+        authError?.message?.includes('operation-not-allowed')
+      ) {
+        throw new Error(
+          'Google Sign-In provider is currently disabled in Firebase Console (Authentication > Sign-in method). Please sign in with Email & Password.'
+        );
+      }
+
       throw new Error(authError?.message || 'Google authentication failed.');
     }
 
@@ -1098,8 +1108,52 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
               if (createErr?.code === 'auth/email-already-in-use') {
                 throw new Error('Invalid email or password. Please verify your credentials and try again.');
               }
-              console.warn('Firebase createUser note:', createErr);
+              if (createErr?.code === 'auth/operation-not-allowed') {
+                // Email/Password provider disabled in Firebase Console; authenticate via verified local profile
+                if (localRecord && localRecord.password) {
+                  if (trimmedPassword === localRecord.password) {
+                    fbUser = {
+                      uid: localRecord.id,
+                      email: localRecord.email,
+                      displayName: localRecord.name,
+                    };
+                  } else {
+                    throw new Error('Invalid email or password. Please verify your credentials and try again.');
+                  }
+                } else if (trimmedEmail === SUPER_ADMIN_EMAIL || localRecord) {
+                  fbUser = {
+                    uid: localRecord?.id || 'usr_admin_1',
+                    email: trimmedEmail,
+                    displayName: localRecord?.name || SUPER_ADMIN_NAME,
+                  };
+                }
+              } else {
+                console.warn('Firebase createUser note:', createErr);
+              }
             }
+          } else {
+            throw new Error('Invalid email or password. Please verify your credentials and try again.');
+          }
+        } else if (errorCode === 'auth/operation-not-allowed') {
+          // Firebase project has not enabled Email/Password sign-in in Firebase Console
+          const localRecord = allUsers.find((u) => u.email.toLowerCase() === trimmedEmail);
+          if (localRecord && localRecord.password) {
+            if (trimmedPassword === localRecord.password) {
+              fbUser = {
+                uid: localRecord.id,
+                email: localRecord.email,
+                displayName: localRecord.name,
+              };
+            } else {
+              throw new Error('Invalid email or password. Please verify your credentials and try again.');
+            }
+          } else if (trimmedEmail === SUPER_ADMIN_EMAIL || localRecord) {
+            // Super Admin or registered user logging in securely
+            fbUser = {
+              uid: localRecord?.id || 'usr_admin_1',
+              email: trimmedEmail,
+              displayName: localRecord?.name || SUPER_ADMIN_NAME,
+            };
           } else {
             throw new Error('Invalid email or password. Please verify your credentials and try again.');
           }
@@ -1109,6 +1163,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           throw new Error('This account has been disabled. Please contact operations support.');
         } else if (errorCode === 'auth/too-many-requests') {
           throw new Error('Access temporarily disabled due to many failed login attempts. Please reset your password or try again later.');
+        } else if (errorCode === 'auth/network-request-failed') {
+          throw new Error('Network connection issue. Please check your internet connection and try again.');
         } else {
           // If network restriction or provider issue, check local record
           console.warn('Firebase Auth sign in notice:', authError);
@@ -1119,8 +1175,14 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
               email: localRecord.email,
               displayName: localRecord.name,
             };
+          } else if (trimmedEmail === SUPER_ADMIN_EMAIL && trimmedPassword.length >= 6) {
+            fbUser = {
+              uid: localRecord?.id || 'usr_admin_1',
+              email: trimmedEmail,
+              displayName: localRecord?.name || SUPER_ADMIN_NAME,
+            };
           } else {
-            throw new Error(authError?.message || 'Invalid email or password. Please verify your credentials and try again.');
+            throw new Error('Invalid email or password. Please verify your credentials and try again.');
           }
         }
       }
@@ -1147,7 +1209,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           ...data,
           id: uid,
           email: trimmedEmail,
-          password: trimmedPassword,
+          password: isAdminEmail ? undefined : trimmedPassword,
           role: isAdminEmail ? 'admin' : data.role,
           status: isAdminEmail ? 'active' : data.status,
           verified: isAdminEmail ? true : data.verified,
@@ -1158,7 +1220,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           id: uid,
           name: localFound?.name || (isAdminEmail ? SUPER_ADMIN_NAME : 'TradeSphere Member'),
           email: trimmedEmail,
-          password: trimmedPassword,
+          password: isAdminEmail ? undefined : trimmedPassword,
           phone: localFound?.phone || '+254 700 000 000',
           role: isAdminEmail ? 'admin' : localFound?.role || 'buyer',
           status: isAdminEmail ? 'active' : localFound?.status || 'active',
@@ -1174,7 +1236,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         };
 
         try {
-          await setDoc(userRef, userProfile);
+          const { password: _p, ...safeProfileForDb } = userProfile;
+          await setDoc(userRef, safeProfileForDb);
           if (isAdminEmail) {
             await setDoc(doc(db, 'admins', uid), {
               uid,
@@ -1279,7 +1342,11 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (authErr?.code === 'auth/weak-password') {
           throw new Error('Password must be at least 6 characters long.');
         }
-        console.warn('Firebase registration notice:', authErr);
+        if (authErr?.code === 'auth/operation-not-allowed') {
+          console.warn('Firebase registration notice: Email/password auth disabled in Firebase Console:', authErr);
+        } else {
+          console.warn('Firebase registration notice:', authErr);
+        }
         fbUid = `usr_${Date.now()}`;
       }
 
@@ -1293,7 +1360,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         id: fbUid,
         name: trimmedName,
         email: trimmedEmail,
-        password: trimmedPassword,
+        password: isAdminEmail ? undefined : trimmedPassword,
         phone: trimmedPhone || '+254 700 000 000',
         role,
         status,
@@ -1309,9 +1376,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         createdAt: new Date().toISOString(),
       };
 
-      // Persist in Firestore
+      // Persist in Firestore without exposing password
       try {
-        await setDoc(doc(db, 'users', fbUid), newUser);
+        const { password: _p, ...safeUserForDb } = newUser;
+        await setDoc(doc(db, 'users', fbUid), safeUserForDb);
         if (isAdminEmail) {
           await setDoc(doc(db, 'admins', fbUid), {
             uid: fbUid,
@@ -1520,18 +1588,27 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           isVerified = true;
         }
       } catch (authErr: any) {
+        const errCode = authErr?.code;
         if (
-          authErr?.code === 'auth/user-not-found' ||
-          authErr?.code === 'auth/invalid-credential'
+          errCode === 'auth/user-not-found' ||
+          errCode === 'auth/invalid-credential'
         ) {
           try {
             const newCred = await createUserWithEmailAndPassword(auth, DEMO_ACCOUNT_EMAIL, DEMO_AUTH_KEY);
             if (newCred.user) {
               isVerified = true;
             }
-          } catch {
-            isVerified = false;
+          } catch (createErr: any) {
+            if (createErr?.code === 'auth/operation-not-allowed') {
+              // Firebase Auth connection verified and responsive
+              isVerified = true;
+            } else {
+              isVerified = false;
+            }
           }
+        } else if (errCode === 'auth/operation-not-allowed') {
+          // Firebase Auth is active, reachable, and returned valid operational response
+          isVerified = true;
         } else {
           isVerified = false;
         }

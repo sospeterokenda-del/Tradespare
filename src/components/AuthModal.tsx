@@ -103,6 +103,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
+  // Format Firebase & authentication errors with clear user-friendly messages
+  const formatAuthErrorMessage = (err: any): string => {
+    const msg = err?.message || String(err || '');
+    if (msg.includes('auth/operation-not-allowed') || msg.includes('operation-not-allowed')) {
+      return 'Email/Password sign-in provider is disabled in Firebase Console. Please sign in with your registered account credentials or enable Email/Password under Firebase Console > Authentication > Sign-in method.';
+    }
+    if (msg.includes('auth/unauthorized-domain') || msg.includes('unauthorized-domain')) {
+      return 'Google Sign-In is awaiting domain authorization for tradesphere.netlify.app in Firebase Console. Please sign in with Email & Password using sospeterokenda@gmail.com for instant Super Admin access.';
+    }
+    if (msg.includes('auth/wrong-password') || msg.includes('auth/invalid-credential') || msg.includes('auth/user-not-found')) {
+      return 'Invalid email or password. Please verify your credentials and try again.';
+    }
+    if (msg.includes('auth/too-many-requests')) {
+      return 'Access temporarily disabled due to multiple failed login attempts. Please reset your password or try again later.';
+    }
+    if (msg.includes('auth/network-request-failed')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    return msg || 'Invalid email or password. Please verify your credentials and try again.';
+  };
+
   if (!isOpen) return null;
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
@@ -135,8 +156,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onSuccessfulLogin(user);
       }
     } catch (err: any) {
-      // Do not reveal whether email exists; generic secure message
-      setErrorMsg(err.message || 'Invalid email or password. Please verify your credentials and try again.');
+      setErrorMsg(formatAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -183,7 +203,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         onSuccessfulLogin(newUser);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed. Please check your information.');
+      setErrorMsg(formatAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -266,7 +286,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         // Do not display an aggressive error if user intentionally closed the window
         setErrorMsg(null);
       } else {
-        setErrorMsg(err.message || 'Google authentication failed.');
+        setErrorMsg(formatAuthErrorMessage(err));
       }
     } finally {
       setIsLoading(false);

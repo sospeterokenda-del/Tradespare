@@ -70,13 +70,15 @@ export interface FirestoreErrorInfo {
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errMsg = error instanceof Error ? error.message : String(error);
-  // Never treat user-cancelled auth popups or domain authorization messages as fatal Firestore errors
+  // Never treat user-cancelled auth popups, domain authorization, or provider notices as fatal Firestore errors
   if (
     errMsg.includes('auth/popup-closed-by-user') ||
     errMsg.includes('auth/cancelled-popup-request') ||
     errMsg.includes('popup-closed-by-user') ||
     errMsg.includes('auth/unauthorized-domain') ||
-    errMsg.includes('unauthorized-domain')
+    errMsg.includes('unauthorized-domain') ||
+    errMsg.includes('auth/operation-not-allowed') ||
+    errMsg.includes('operation-not-allowed')
   ) {
     return;
   }

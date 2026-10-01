@@ -100,6 +100,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
   const [activePolicyTab, setActivePolicyTab] = useState<'verification' | 'recovery' | 'admin'>('verification');
 
+  // Format Firebase & authentication errors with clear user-friendly messages
+  const formatAuthErrorMessage = (err: any): string => {
+    const msg = err?.message || String(err || '');
+    if (msg.includes('auth/operation-not-allowed') || msg.includes('operation-not-allowed')) {
+      return 'Email/Password sign-in provider is disabled in Firebase Console. Please sign in with your registered account credentials or enable Email/Password under Firebase Console > Authentication > Sign-in method.';
+    }
+    if (msg.includes('auth/unauthorized-domain') || msg.includes('unauthorized-domain')) {
+      return 'Google Sign-In is awaiting domain authorization for tradesphere.netlify.app in Firebase Console. Please sign in with Email & Password using sospeterokenda@gmail.com for instant Super Admin access.';
+    }
+    if (msg.includes('auth/wrong-password') || msg.includes('auth/invalid-credential') || msg.includes('auth/user-not-found')) {
+      return 'Invalid email or password. Please verify your credentials and try again.';
+    }
+    if (msg.includes('auth/too-many-requests')) {
+      return 'Access temporarily disabled due to many failed login attempts. Please reset your password or try again later.';
+    }
+    if (msg.includes('auth/network-request-failed')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    return msg || 'Invalid email or password. Please verify your credentials and try again.';
+  };
+
   // Handle Role-Based Post-Login Navigation
   const handleRoleRedirect = (user: { role: UserRole; status: string; email?: string }) => {
     if (user.role === 'admin' || user.email?.toLowerCase() === 'sospeterokenda@gmail.com') {
@@ -139,8 +160,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       const loggedUser = await loginWithCredentials(loginEmail, loginPassword);
       handleRoleRedirect(loggedUser);
     } catch (err: any) {
-      // Requirements: Show clear error for incorrect credentials without revealing email existence
-      setErrorMsg(err.message || 'Invalid email or password. Please verify your credentials and try again.');
+      setErrorMsg(formatAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +206,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       handleRoleRedirect(registeredUser);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Registration failed. Please review your details and try again.');
+      setErrorMsg(formatAuthErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -278,7 +298,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         // User voluntarily closed popup
         setErrorMsg(null);
       } else {
-        setErrorMsg(err.message || 'Google authentication failed.');
+        setErrorMsg(formatAuthErrorMessage(err));
       }
     } finally {
       setIsLoading(false);
