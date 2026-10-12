@@ -121,6 +121,7 @@ function MainApp() {
 
       {/* Main Content Router with RBAC Route Guards */}
       <main className="flex-1 overflow-x-hidden w-full">
+        <div key={currentView} className="page-transition w-full">
         {/* Home Page */}
         {currentView === 'home' && (
           <HomePage
@@ -346,6 +347,7 @@ function MainApp() {
             />
           )
         )}
+        </div>
       </main>
 
       {/* Global Footer */}

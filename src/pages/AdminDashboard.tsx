@@ -804,11 +804,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {/* User & Contact */}
                             <td className="py-3.5 px-4">
                               <div className="flex items-center gap-3">
-                                <img
-                                  src={u.avatar}
-                                  alt={u.name}
-                                  className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
-                                />
+                                {(u.profilePhotoURL || u.avatar) ? (
+                                  <img
+                                    src={u.profilePhotoURL || u.avatar || undefined}
+                                    alt={u.name}
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-200 flex-shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 font-bold text-xs flex-shrink-0">
+                                    {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                                  </div>
+                                )}
                                 <div className="overflow-hidden min-w-0">
                                   <div className="flex items-center gap-1.5">
                                     <p className="font-bold text-slate-900 truncate">{u.name}</p>

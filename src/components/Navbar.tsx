@@ -27,6 +27,7 @@ import {
   Sprout,
   Store,
   Tv,
+  User,
   UserCheck,
   UserPlus,
   X,
@@ -356,11 +357,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className="flex items-center gap-2 p-1 pl-1.5 rounded-2xl hover:bg-slate-100 transition border border-slate-200 min-h-[40px]"
                   >
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name}
-                      className="w-8 h-8 rounded-full object-cover border border-slate-300"
-                    />
+                    {(currentUser.profilePhotoURL || currentUser.avatar) ? (
+                      <img
+                        src={currentUser.profilePhotoURL || currentUser.avatar || undefined}
+                        alt={currentUser.name}
+                        className="w-8 h-8 rounded-full object-cover border border-slate-300"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-500">
+                        <User className="w-4 h-4 text-slate-500" />
+                      </div>
+                    )}
                     <ChevronDown className="w-3.5 h-3.5 text-slate-600 mr-1" />
                   </button>
 
@@ -477,11 +484,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="p-2.5 rounded-xl text-slate-700 hover:bg-slate-100 md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95 transition"
               aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
             >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6 text-slate-900" />
-              ) : (
-                <Menu className="w-6 h-6 text-slate-900" />
-              )}
+              <div className={`transition-transform duration-200 ${isMobileMenuOpen ? 'rotate-90' : 'rotate-0'}`}>
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6 text-slate-900" />
+                ) : (
+                  <Menu className="w-6 h-6 text-slate-900" />
+                )}
+              </div>
             </button>
           </div>
         </div>
@@ -554,15 +563,27 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Full Mobile Hamburger Drawer Navigation */}
       {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-x-0 top-[calc(100%+1px)] bg-white border-b border-slate-200 shadow-2xl max-h-[85vh] overflow-y-auto z-50 p-4 space-y-4 animate-in slide-in-from-top duration-200">
+        <>
+          <div
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden fixed inset-0 top-[65px] bg-slate-950/40 backdrop-blur-xs z-40 mobile-menu-backdrop animate-in fade-in duration-300"
+            aria-hidden="true"
+          />
+          <div className="md:hidden fixed inset-x-0 top-[calc(100%+1px)] bg-white border-b border-slate-200 shadow-2xl max-h-[85vh] overflow-y-auto z-50 p-4 space-y-4 animate-mobile-menu">
           {/* User Profile Quick Card */}
           <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 overflow-hidden">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-11 h-11 rounded-xl object-cover border border-slate-300 flex-shrink-0"
-              />
+              {(currentUser.profilePhotoURL || currentUser.avatar) ? (
+                <img
+                  src={currentUser.profilePhotoURL || currentUser.avatar || undefined}
+                  alt={currentUser.name}
+                  className="w-11 h-11 rounded-xl object-cover border border-slate-300 flex-shrink-0"
+                />
+              ) : (
+                <div className="w-11 h-11 rounded-xl bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-500 flex-shrink-0">
+                  <User className="w-5 h-5 text-slate-500" />
+                </div>
+              )}
               <div className="overflow-hidden">
                 <p className="font-bold text-sm text-slate-900 truncate">{currentUser.name}</p>
                 <p className="text-xs text-slate-500 truncate">{currentUser.email}</p>
@@ -737,6 +758,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           </div>
         </div>
+        </>
       )}
     </header>
   );

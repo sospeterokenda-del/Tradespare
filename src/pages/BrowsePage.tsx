@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { ProductCard } from '../components/ProductCard';
+import { ProductCardSkeleton } from '../components/SkeletonLoader';
 import { useMarketplace } from '../context/MarketplaceContext';
 import { CATEGORIES } from '../data/mockData';
 import { Product, ProductCondition } from '../types';
@@ -404,7 +405,7 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({
               </button>
             </div>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
               {filteredProducts.map((p) => (
                 <ProductCard
                   key={p.id}
@@ -415,18 +416,20 @@ export const BrowsePage: React.FC<BrowsePageProps> = ({
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-in fade-in duration-300">
               {filteredProducts.map((p) => (
                 <div
                   key={p.id}
                   onClick={() => onSelectProduct(p)}
-                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs hover:shadow-md transition flex flex-col sm:flex-row gap-4 cursor-pointer"
+                  className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs card-hover-lift hover:border-indigo-300 flex flex-col sm:flex-row gap-4 cursor-pointer group"
                 >
-                  <img
-                    src={p.images[0]}
-                    alt={p.title}
-                    className="w-full sm:w-44 h-40 rounded-xl object-cover flex-shrink-0"
-                  />
+                  <div className="w-full sm:w-44 h-40 rounded-xl overflow-hidden img-zoom-container flex-shrink-0">
+                    <img
+                      src={p.images[0]}
+                      alt={p.title}
+                      className="w-full h-full object-cover img-zoom-hover"
+                    />
+                  </div>
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between text-xs text-slate-400 mb-1">

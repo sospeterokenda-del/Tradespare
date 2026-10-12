@@ -9,7 +9,8 @@ export interface User {
   phone: string;
   role: UserRole;
   status: UserStatus;
-  avatar: string;
+  avatar?: string | null;
+  profilePhotoURL?: string | null;
   verified: boolean;
   businessId?: string;
   businessName?: string;

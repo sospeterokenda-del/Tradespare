@@ -20,6 +20,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import { AnimatedSection } from '../components/AnimatedSection';
 import { ProductCard } from '../components/ProductCard';
 import { useMarketplace } from '../context/MarketplaceContext';
 import { CATEGORIES } from '../data/mockData';
@@ -69,13 +70,19 @@ export const HomePage: React.FC<HomePageProps> = ({
 
         <div className="max-w-5xl mx-auto text-center relative z-10 space-y-4 sm:space-y-6">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs font-semibold text-indigo-200">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300 flex-shrink-0" />
+          <div
+            style={{ animationDelay: '0ms' }}
+            className="animate-hero-item inline-flex items-center gap-2 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] sm:text-xs font-semibold text-indigo-200"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300 flex-shrink-0 animate-status-pulse" />
             <span className="truncate">The Premier Verified B2B & B2C Marketplace</span>
           </div>
 
           {/* Headline required by prompt */}
-          <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans">
+          <h1
+            style={{ animationDelay: '100ms' }}
+            className="animate-hero-item text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans"
+          >
             Discover Products. <br className="hidden sm:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-teal-300 to-emerald-400">
               Connect With Businesses.
@@ -84,15 +91,21 @@ export const HomePage: React.FC<HomePageProps> = ({
             Grow Your Sales.
           </h1>
 
-          <p className="max-w-2xl mx-auto text-slate-300 text-xs sm:text-base leading-relaxed px-1">
+          <p
+            style={{ animationDelay: '200ms' }}
+            className="animate-hero-item max-w-2xl mx-auto text-slate-300 text-xs sm:text-base leading-relaxed px-1"
+          >
             Source genuine electronics, vehicles, agricultural machinery, construction supplies, fashion, and verified services directly from registered enterprises with M-Pesa & Card escrow protection.
           </p>
 
           {/* Search bar with placeholder required by prompt */}
-          <div className="max-w-2xl mx-auto pt-2">
+          <div
+            style={{ animationDelay: '300ms' }}
+            className="animate-hero-item max-w-2xl mx-auto pt-2"
+          >
             <form
               onSubmit={handleHeroSearch}
-              className="bg-white p-2 rounded-2xl sm:rounded-full shadow-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-100"
+              className="bg-white p-2 rounded-2xl sm:rounded-full shadow-2xl flex flex-col sm:flex-row items-center gap-2 border border-slate-100 transition-shadow duration-300 focus-within:shadow-indigo-500/20 focus-within:border-indigo-300"
             >
               <div className="flex-1 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 w-full min-h-[44px]">
                 <Search className="w-5 h-5 text-slate-400 flex-shrink-0" />
@@ -107,7 +120,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
               <button
                 type="submit"
-                className="w-full sm:w-auto px-7 py-3 rounded-xl sm:rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 min-h-[44px]"
+                className="w-full sm:w-auto px-7 py-3 rounded-xl sm:rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-95 min-h-[44px]"
               >
                 <span>Search</span>
                 <ArrowRight className="w-4 h-4" />
@@ -115,7 +128,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             </form>
 
             {/* Quick popular tags */}
-            <div className="flex items-center justify-center flex-wrap gap-1.5 sm:gap-2 mt-4 text-xs text-slate-400">
+            <div
+              style={{ animationDelay: '400ms' }}
+              className="animate-hero-item flex items-center justify-center flex-wrap gap-1.5 sm:gap-2 mt-4 text-xs text-slate-400"
+            >
               <span className="font-semibold text-slate-300 text-[11px] sm:text-xs">Popular:</span>
               {['Solar Pumps', 'MacBook Pro', 'DeWalt Drills', 'Toyota Prado', 'Leather Bags'].map((term) => (
                 <button
@@ -124,7 +140,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                     onSearchChange(term);
                     onNavigate('browse');
                   }}
-                  className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 transition text-[11px] min-h-[30px]"
+                  className="px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 transition text-[11px] min-h-[30px] active:scale-95"
                 >
                   {term}
                 </button>
@@ -133,10 +149,13 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Required CTAs: “Post a Product” and “Explore Products” */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4">
+          <div
+            style={{ animationDelay: '500ms' }}
+            className="animate-hero-item flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4"
+          >
             <button
               onClick={() => onNavigate('post-product')}
-              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all active:scale-95 min-h-[48px]"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all active:scale-95 min-h-[48px]"
             >
               <PlusCircle className="w-5 h-5" />
               <span>Post a Product</span>
@@ -152,7 +171,10 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
 
           {/* Trust KPI Strip */}
-          <div className="pt-8 sm:pt-10 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto border-t border-white/10">
+          <div
+            style={{ animationDelay: '600ms' }}
+            className="animate-hero-item pt-8 sm:pt-10 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto border-t border-white/10"
+          >
             <div className="p-2">
               <p className="text-xl sm:text-3xl font-black text-white">12,400+</p>
               <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Verified Businesses</p>
@@ -174,7 +196,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       </section>
 
       {/* Categories Grid */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Explore Categories</h2>
@@ -184,7 +206,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
           <button
             onClick={() => onNavigate('browse')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2 transition-colors"
           >
             <span>View All</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -199,13 +221,13 @@ export const HomePage: React.FC<HomePageProps> = ({
                 onCategorySelect(cat.id);
                 onNavigate('browse');
               }}
-              className="group bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-xs hover:shadow-lg hover:border-indigo-200 transition-all cursor-pointer flex flex-col justify-between"
+              className="group bg-white rounded-2xl p-3 sm:p-4 border border-slate-200/80 shadow-xs card-hover-lift hover:border-indigo-200 cursor-pointer flex flex-col justify-between"
             >
-              <div className="aspect-square rounded-xl overflow-hidden mb-2 sm:mb-3 bg-slate-100 w-full max-w-full">
+              <div className="aspect-square rounded-xl overflow-hidden mb-2 sm:mb-3 bg-slate-100 w-full max-w-full img-zoom-container">
                 <img
                   src={cat.image}
                   alt={cat.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  className="w-full h-full object-cover img-zoom-hover"
                   loading="lazy"
                 />
               </div>
@@ -218,10 +240,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           ))}
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Featured Products */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <div>
             <div className="flex items-center gap-2">
@@ -236,7 +258,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
           <button
             onClick={() => onNavigate('browse')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2 transition-colors"
           >
             <span>See More</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -253,15 +275,15 @@ export const HomePage: React.FC<HomePageProps> = ({
             />
           ))}
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Top Verified Businesses Showcase */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-slate-900 to-indigo-950 rounded-3xl p-5 sm:p-10 text-white shadow-xl relative overflow-hidden">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div>
               <div className="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-                <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <ShieldCheck className="w-4 h-4 text-emerald-400 flex-shrink-0 animate-status-pulse" />
                 <span>Verified Merchant Network</span>
               </div>
               <h2 className="text-xl sm:text-3xl font-extrabold text-white mt-1">
@@ -273,7 +295,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
             <button
               onClick={() => onNavigate('post-product')}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition min-h-[44px]"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-slate-100 text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition active:scale-95 min-h-[44px]"
             >
               <Store className="w-4 h-4 text-indigo-600" />
               <span>Register Your Business</span>
@@ -285,14 +307,16 @@ export const HomePage: React.FC<HomePageProps> = ({
               <div
                 key={biz.id}
                 onClick={() => onSelectBusiness(biz)}
-                className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 hover:bg-white/15 transition-all cursor-pointer flex flex-col justify-between space-y-4 group"
+                className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/15 hover:bg-white/15 transition-all card-hover-lift cursor-pointer flex flex-col justify-between space-y-4 group"
               >
                 <div className="flex items-center gap-3">
-                  <img
-                    src={biz.logo}
-                    alt={biz.businessName}
-                    className="w-12 h-12 rounded-xl object-cover border border-white/20 flex-shrink-0"
-                  />
+                  <div className="w-12 h-12 rounded-xl overflow-hidden img-zoom-container flex-shrink-0 border border-white/20">
+                    <img
+                      src={biz.logo}
+                      alt={biz.businessName}
+                      className="w-full h-full object-cover img-zoom-hover"
+                    />
+                  </div>
                   <div className="overflow-hidden">
                     <div className="flex items-center gap-1">
                       <h4 className="font-bold text-sm text-white group-hover:text-indigo-300 transition-colors truncate">
@@ -327,10 +351,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             ))}
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Recent Listings Grid */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">Recent Listings</h2>
@@ -340,7 +364,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
           <button
             onClick={() => onNavigate('browse')}
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 group min-h-[44px] pl-2 transition-colors"
           >
             <span>Browse Catalog</span>
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -357,10 +381,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             />
           ))}
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* "How It Works" Section */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="bg-slate-50 rounded-3xl p-5 sm:p-12 border border-slate-200/80">
           <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10 space-y-3">
             <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">
@@ -398,8 +422,8 @@ export const HomePage: React.FC<HomePageProps> = ({
 
           {activeTabHowItWorks === 'buyers' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   1
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Search & Compare</h3>
@@ -408,8 +432,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
 
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   2
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Direct Contact or Instant Order</h3>
@@ -418,8 +442,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
 
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   3
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Protected Delivery</h3>
@@ -430,8 +454,8 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-8">
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   1
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Create Business Profile</h3>
@@ -440,8 +464,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
 
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   2
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Publish Products with Live Preview</h3>
@@ -450,8 +474,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
 
-              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center text-center space-y-3">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner">
+              <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col items-center text-center space-y-3">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-extrabold text-lg sm:text-xl shadow-inner transition-transform group-hover:scale-105">
                   3
                 </div>
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">Receive Inquiries & Fulfill Orders</h3>
@@ -462,10 +486,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           )}
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Testimonials */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="text-center max-w-xl mx-auto mb-8 sm:mb-10 space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
             Real Feedback
@@ -477,7 +501,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col justify-between space-y-4">
             <div className="space-y-2">
               <div className="flex text-amber-400">
                 {[...Array(5)].map((_, i) => (
@@ -501,7 +525,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col justify-between space-y-4">
             <div className="space-y-2">
               <div className="flex text-amber-400">
                 {[...Array(5)].map((_, i) => (
@@ -525,7 +549,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
 
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-4">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-xs card-hover-lift flex flex-col justify-between space-y-4">
             <div className="space-y-2">
               <div className="flex text-amber-400">
                 {[...Array(5)].map((_, i) => (
@@ -549,10 +573,10 @@ export const HomePage: React.FC<HomePageProps> = ({
             </div>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
 
       {/* Monetization / Sell With Us CTA Banner */}
-      <section className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+      <AnimatedSection className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-800 rounded-3xl p-6 sm:p-12 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
           <div className="space-y-3 max-w-xl text-center md:text-left">
             <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-300 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-400/30">
@@ -580,7 +604,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </button>
           </div>
         </div>
-      </section>
+      </AnimatedSection>
     </div>
   );
 };

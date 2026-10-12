@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   ShoppingBag,
   Store,
+  User,
   UserCheck,
 } from 'lucide-react';
 import { useMarketplace } from '../context/MarketplaceContext';
@@ -108,11 +109,17 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
         {currentUser && currentUser.id !== 'usr_guest' && (
           <div className="max-w-md mx-auto mb-8 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-left">
             <div className="flex items-center gap-3">
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-10 h-10 rounded-full object-cover border border-slate-300"
-              />
+              {(currentUser.profilePhotoURL || currentUser.avatar) ? (
+                <img
+                  src={currentUser.profilePhotoURL || currentUser.avatar || undefined}
+                  alt={currentUser.name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-300"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-500 flex-shrink-0">
+                  <User className="w-5 h-5 text-slate-400" />
+                </div>
+              )}
               <div className="overflow-hidden">
                 <p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p>
                 <p className="text-[11px] text-slate-500 truncate">{currentUser.email}</p>

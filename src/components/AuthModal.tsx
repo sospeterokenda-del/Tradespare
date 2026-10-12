@@ -879,7 +879,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onClick={() => autofillDemo(u.email)}
                     className="p-2 bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 hover:border-indigo-300 rounded-xl text-left transition flex items-center gap-2 group min-h-[44px]"
                   >
-                    <img src={u.avatar} alt={u.name} className="w-7 h-7 rounded-full object-cover border border-slate-300 flex-shrink-0" />
+                    {(u.profilePhotoURL || u.avatar) ? (
+                      <img src={u.profilePhotoURL || u.avatar || undefined} alt={u.name} className="w-7 h-7 rounded-full object-cover border border-slate-300 flex-shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600 flex-shrink-0">
+                        {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                    )}
                     <div className="overflow-hidden min-w-0">
                       <p className="text-[11px] font-bold text-slate-800 truncate group-hover:text-indigo-600">{u.name}</p>
                       <div className="flex items-center gap-1">

@@ -23,6 +23,7 @@ import {
   Truck,
   Video,
 } from 'lucide-react';
+import { AnimatedSection } from '../components/AnimatedSection';
 import { ContactModal } from '../components/ContactModal';
 import { OrderModal } from '../components/OrderModal';
 import { ProductCard } from '../components/ProductCard';
@@ -146,7 +147,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Image Gallery (5 Cols) */}
         <div className="lg:col-span-6 space-y-4">
-          <div className="relative aspect-4/3 rounded-3xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-md">
+          <div className="relative aspect-4/3 rounded-3xl overflow-hidden bg-slate-100 border border-slate-200/80 shadow-md group img-zoom-container">
             {showVideo && product.videoUrl ? (
               <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6 text-center text-white">
                 <Video className="w-12 h-12 text-indigo-400 mb-2" />
@@ -174,7 +175,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <img
                 src={product.images[selectedImageIndex] || product.images[0]}
                 alt={product.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover img-zoom-hover transition-transform duration-500"
               />
             )}
 
@@ -599,7 +600,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (
-        <div className="pt-8 border-t border-slate-200 space-y-6">
+        <AnimatedSection className="pt-8 border-t border-slate-200 space-y-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-slate-900">Related Products in this Category</h3>
             <button
@@ -619,7 +620,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               />
             ))}
           </div>
-        </div>
+        </AnimatedSection>
       )}
 
       {/* Modals */}

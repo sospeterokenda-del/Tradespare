@@ -99,7 +99,7 @@ service cloud.firestore {
             incoming().role == existing().role &&
             incoming().status == existing().status &&
             incoming().diff(existing()).affectedKeys().hasOnly([
-              'name', 'phone', 'avatar', 'businessName', 'location', 'updatedAt'
+              'name', 'phone', 'avatar', 'profilePhotoURL', 'businessName', 'location', 'updatedAt'
             ])
           )
         );

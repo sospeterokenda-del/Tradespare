@@ -42,14 +42,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <div
       onClick={() => onSelect(product)}
-      className="group bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 hover:border-indigo-400/80 shadow-xs hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden cursor-pointer relative"
+      className="group bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 hover:border-indigo-400/80 shadow-xs card-hover-lift flex flex-col overflow-hidden cursor-pointer relative"
     >
       {/* Product Image Stage */}
-      <div className="relative aspect-4/3 w-full max-w-full overflow-hidden bg-slate-100">
+      <div className="relative aspect-4/3 w-full max-w-full overflow-hidden bg-slate-100 img-zoom-container">
         <img
           src={product.images[currentImgIndex] || product.images[0]}
           alt={product.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 max-w-full"
+          className="w-full h-full object-cover img-zoom-hover max-w-full"
           loading="lazy"
         />
 
@@ -74,15 +74,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             e.stopPropagation();
             toggleWishlist(product.id);
           }}
-          className={`absolute top-2.5 right-2.5 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 shadow-sm min-h-[40px] min-w-[40px] ${
+          className={`absolute top-2.5 right-2.5 w-10 h-10 rounded-full flex items-center justify-center transition-all z-10 shadow-sm min-h-[40px] min-w-[40px] active:scale-90 ${
             isFavorited
               ? 'bg-rose-50 text-rose-600 scale-110'
-              : 'bg-white/90 text-slate-600 hover:text-rose-500 hover:bg-white'
+              : 'bg-white/90 text-slate-600 hover:text-rose-500 hover:bg-white hover:scale-105'
           }`}
           title={isFavorited ? 'Remove from wishlist' : 'Save to wishlist'}
           aria-label="Wishlist"
         >
-          <Heart className={`w-4 h-4 ${isFavorited ? 'fill-rose-500' : ''}`} />
+          <Heart className={`w-4 h-4 transition-transform duration-200 ${isFavorited ? 'fill-rose-500 scale-110' : ''}`} />
         </button>
 
         {/* Video demonstration indicator */}

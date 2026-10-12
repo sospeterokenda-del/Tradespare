@@ -40,6 +40,11 @@
           "description": "URL to profile avatar image",
           "maxLength": 500
         },
+        "profilePhotoURL": {
+          "type": "string",
+          "description": "URL to uploaded user profile photo or null if unuploaded",
+          "maxLength": 500
+        },
         "businessName": {
           "type": "string",
           "description": "Registered store or merchant trade name",

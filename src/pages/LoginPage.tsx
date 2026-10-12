@@ -968,11 +968,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     className="w-full p-2.5 bg-slate-50 hover:bg-indigo-50/60 border border-slate-200 hover:border-indigo-300 rounded-2xl text-left transition flex items-center justify-between group min-h-[46px]"
                   >
                     <div className="flex items-center gap-2.5 overflow-hidden">
-                      <img
-                        src={u.avatar}
-                        alt={u.name}
-                        className="w-8 h-8 rounded-full object-cover border border-slate-300 flex-shrink-0"
-                      />
+                      {(u.profilePhotoURL || u.avatar) ? (
+                        <img
+                          src={u.profilePhotoURL || u.avatar || undefined}
+                          alt={u.name}
+                          className="w-8 h-8 rounded-full object-cover border border-slate-300 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[10px] font-bold text-slate-600 flex-shrink-0">
+                          {u.name ? u.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                      )}
                       <div className="overflow-hidden">
                         <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
                           {u.name}

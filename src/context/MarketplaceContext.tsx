@@ -479,9 +479,12 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
               phone: firebaseUser.phoneNumber || '+254 700 000 000',
               role: isAdminEmail ? 'admin' : 'buyer',
               status: 'active',
-              avatar:
-                firebaseUser.photoURL ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+              avatar: isAdminEmail
+                ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+                : (firebaseUser.photoURL || null),
+              profilePhotoURL: isAdminEmail
+                ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+                : (firebaseUser.photoURL || null),
               verified: true,
               location: 'Nairobi, Kenya',
               createdAt: new Date().toISOString(),
@@ -520,8 +523,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       phone: '+254 700 000 000',
       role: 'buyer',
       status: 'active',
-      avatar:
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+      avatar: null,
+      profilePhotoURL: null,
       verified: false,
       location: 'Nairobi, Kenya',
       createdAt: new Date().toISOString(),
@@ -1020,7 +1023,12 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
             fbUser.photoURL ||
             (isAdminEmail
               ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'),
+              : null),
+          profilePhotoURL:
+            fbUser.photoURL ||
+            (isAdminEmail
+              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+              : null),
           verified: isAdminEmail,
           location: 'Platform Operations HQ, Nairobi, Kenya',
           createdAt: new Date().toISOString(),
@@ -1226,10 +1234,13 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           status: isAdminEmail ? 'active' : localFound?.status || 'active',
           businessName: localFound?.businessName,
           avatar:
-            localFound?.avatar ||
             (isAdminEmail
               ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
-              : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'),
+              : (localFound?.profilePhotoURL ?? localFound?.avatar ?? null)),
+          profilePhotoURL:
+            (isAdminEmail
+              ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+              : (localFound?.profilePhotoURL ?? localFound?.avatar ?? null)),
           verified: isAdminEmail || localFound?.verified || false,
           location: localFound?.location || 'Nairobi, Kenya',
           createdAt: localFound?.createdAt || new Date().toISOString(),
@@ -1368,9 +1379,11 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         avatar:
           role === 'admin'
             ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
-            : role === 'seller'
-            ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&auto=format&fit=crop&q=80'
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+            : null,
+        profilePhotoURL:
+          role === 'admin'
+            ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&auto=format&fit=crop&q=80'
+            : null,
         verified: isAdminEmail,
         location: 'Nairobi, Kenya',
         createdAt: new Date().toISOString(),
@@ -2320,7 +2333,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       productId,
       userId: currentUser.id,
       userName: currentUser.name,
-      userAvatar: currentUser.avatar,
+      userAvatar: currentUser.profilePhotoURL || currentUser.avatar || '',
       rating,
       comment,
       createdAt: new Date().toISOString(),
@@ -2381,10 +2394,22 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     showToast('Business storefront profile updated successfully', 'success');
   };
 
-  const updateUserProfile = (updates: Partial<User>) => {
+  const updateUserProfile = async (updates: Partial<User>) => {
     setAllUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? { ...u, ...updates } : u))
+      prev.map((u) => (u.id === currentUser.id ? { ...u, ...updates, updatedAt: new Date().toISOString() } : u))
     );
+    if (currentUser.id && currentUser.id !== 'usr_guest') {
+      try {
+        const userDocRef = doc(db, 'users', currentUser.id);
+        const { password: _p, ...safeUpdates } = updates;
+        await updateDoc(userDocRef, {
+          ...safeUpdates,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Firestore user profile update note:', err);
+      }
+    }
     showToast('User profile settings updated', 'success');
   };
 

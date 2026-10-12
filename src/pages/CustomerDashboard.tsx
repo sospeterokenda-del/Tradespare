@@ -89,22 +89,28 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
   const [email, setEmail] = useState(currentUser.email);
   const [phone, setPhone] = useState(currentUser.phone);
   const [location, setLocation] = useState(currentUser.location || 'Nairobi, Kenya');
-  const [avatar, setAvatar] = useState(currentUser.avatar);
+  const [avatar, setAvatar] = useState<string | null>(currentUser.profilePhotoURL || currentUser.avatar || null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Synchronize state if currentUser updates
+  React.useEffect(() => {
+    setAvatar(currentUser.profilePhotoURL || currentUser.avatar || null);
+  }, [currentUser.profilePhotoURL, currentUser.avatar]);
 
   const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      showToast('Please select a valid image', 'warning');
+      showToast('Please select a valid image file (PNG, JPG, WebP)', 'warning');
       return;
     }
     const reader = new FileReader();
     reader.onload = (ev) => {
       if (typeof ev.target?.result === 'string') {
-        setAvatar(ev.target.result);
-        updateUserProfile({ avatar: ev.target.result });
-        showToast('Profile photo updated from internal storage!', 'success');
+        const dataUrl = ev.target.result;
+        setAvatar(dataUrl);
+        updateUserProfile({ avatar: dataUrl, profilePhotoURL: dataUrl });
+        showToast('Profile picture uploaded successfully!', 'success');
       }
     };
     reader.readAsDataURL(file);
@@ -113,9 +119,15 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
     }
   };
 
+  const handleRemovePhoto = () => {
+    setAvatar(null);
+    updateUserProfile({ avatar: null, profilePhotoURL: null });
+    showToast('Profile picture removed. Returned to empty state.', 'info');
+  };
+
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateUserProfile({ name, email, phone, location, avatar });
+    updateUserProfile({ name, email, phone, location, avatar, profilePhotoURL: avatar });
     showToast('Profile information successfully updated!', 'success');
   };
 
@@ -124,11 +136,17 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
       {/* Buyer Header Banner */}
       <div className="bg-white rounded-3xl p-5 sm:p-8 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-5">
         <div className="flex items-center gap-3 sm:gap-4">
-          <img
-            src={currentUser.avatar}
-            alt={currentUser.name}
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-indigo-100 shadow-xs flex-shrink-0"
-          />
+          {currentUser.profilePhotoURL || currentUser.avatar ? (
+            <img
+              src={(currentUser.profilePhotoURL || currentUser.avatar) || undefined}
+              alt={currentUser.name}
+              className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-indigo-100 shadow-xs flex-shrink-0"
+            />
+          ) : (
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-100 border-2 border-slate-200 flex items-center justify-center flex-shrink-0 text-slate-400">
+              <User className="w-7 h-7 sm:w-8 sm:h-8 text-slate-400" />
+            </div>
+          )}
           <div className="overflow-hidden">
             <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 truncate">{currentUser.name}</h1>
             <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 flex-wrap">
@@ -563,33 +581,74 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
           <form onSubmit={handleSaveProfile} className="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 space-y-6 shadow-xs max-w-2xl">
             <h3 className="font-bold text-base text-slate-900">Personal Information</h3>
 
-            {/* Avatar upload from internal storage */}
-            <input
-              ref={avatarFileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarFile}
-              className="hidden"
-            />
-            <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
-              <img
-                src={avatar}
-                alt={name}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-xs flex-shrink-0"
+            {/* Profile Picture Upload & Management Area */}
+            <div className="space-y-2">
+              <label className="block font-bold text-slate-700 text-xs">Profile Picture</label>
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFile}
+                className="hidden"
               />
-              <div className="space-y-1.5">
-                <p className="font-bold text-xs text-slate-800">Profile Photo</p>
-                <div className="flex items-center gap-2 flex-wrap">
+
+              {avatar ? (
+                /* State with uploaded photo: displays photo with Upload Profile Picture & Remove Photo buttons */
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={avatar}
+                      alt={name}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-200 shadow-xs flex-shrink-0"
+                    />
+                    <div>
+                      <p className="font-bold text-xs text-slate-900">Custom Profile Picture</p>
+                      <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Photo uploaded
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => avatarFileInputRef.current?.click()}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer min-h-[38px]"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload Profile Picture</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer min-h-[38px]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove Photo</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Clean empty profile-photo area with an Upload Profile Picture button instead of an avatar */
+                <div className="p-5 rounded-2xl bg-slate-50/70 border-2 border-dashed border-slate-300 hover:border-indigo-400 transition flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5 text-center sm:text-left">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200/80 border border-slate-300 flex items-center justify-center text-slate-400 flex-shrink-0">
+                      <User className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-xs text-slate-800">No Profile Picture</p>
+                      <p className="text-[11px] text-slate-500">Upload a photo to personalize your marketplace account</p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     onClick={() => avatarFileInputRef.current?.click()}
-                    className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition min-h-[38px] cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition shadow-xs active:scale-98 min-h-[42px] cursor-pointer"
                   >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload from Internal Storage</span>
+                    <Upload className="w-4 h-4" />
+                    <span>Upload Profile Picture</span>
                   </button>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">

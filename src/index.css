@@ -93,3 +93,210 @@
     gap: 0.5rem !important;
   }
 }
+
+/* ==========================================================================
+   Modern, Smooth & Fast Animation System
+   ========================================================================== */
+
+/* Universal Button Micro-interactions: 180ms duration, ease-in-out for hover and focus states */
+button:not(:disabled),
+a[role="button"]:not([aria-disabled="true"]),
+.btn-animated {
+  transition: transform 180ms ease-in-out,
+              box-shadow 180ms ease-in-out,
+              background-color 180ms ease-in-out,
+              border-color 180ms ease-in-out,
+              color 180ms ease-in-out,
+              opacity 180ms ease-in-out;
+  will-change: transform;
+}
+
+button:not(:disabled):hover,
+a[role="button"]:not([aria-disabled="true"]):hover,
+.btn-animated:hover {
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):focus-visible,
+a[role="button"]:not([aria-disabled="true"]):focus-visible,
+.btn-animated:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):active,
+a[role="button"]:not([aria-disabled="true"]):active,
+.btn-animated:active {
+  transform: translateY(0.5px) scale(0.97);
+}
+
+/* Disable hover translations on flat toggles and tiny icon tags to prevent jitter */
+button.no-lift:hover,
+.no-lift:hover {
+  transform: none !important;
+}
+
+/* Cards: 250ms duration, ease-out; lift 4px with a subtle shadow on hover */
+.card-hover-lift {
+  transition: transform 250ms ease-out,
+              box-shadow 250ms ease-out,
+              border-color 250ms ease-out;
+  will-change: transform, box-shadow;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.08), 0 6px 12px -4px rgba(15, 23, 42, 0.04);
+}
+
+/* Images: 350ms duration, ease-out; scale from 1 to 1.03 on hover */
+.img-zoom-container {
+  overflow: hidden;
+}
+
+.img-zoom-hover {
+  transition: transform 350ms ease-out;
+  will-change: transform;
+}
+
+.group:hover .img-zoom-hover,
+.img-zoom-hover:hover {
+  transform: scale(1.03);
+}
+
+/* Hero animation: 700ms duration, ease-out, with 100ms stagger */
+@keyframes heroFadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-item {
+  animation: heroFadeInUp 700ms ease-out both;
+  will-change: opacity, transform;
+}
+
+/* Page transitions: 250ms duration, ease-in-out, using a subtle fade */
+@keyframes pageFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.page-transition {
+  animation: pageFadeIn 250ms ease-in-out both;
+  will-change: opacity;
+}
+
+/* Mobile navigation menu: 300ms duration, ease-in-out for opening and closing */
+@keyframes mobileDrawerSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-mobile-menu {
+  animation: mobileDrawerSlideIn 300ms ease-in-out both;
+  will-change: opacity, transform;
+}
+
+.mobile-menu-backdrop {
+  transition: opacity 300ms ease-in-out;
+}
+
+/* Section reveal utility if used directly */
+.section-reveal {
+  transition: opacity 500ms ease-out, transform 500ms ease-out;
+  will-change: opacity, transform;
+}
+
+/* Shimmer Skeleton Loading State */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background-color: #f1f5f9;
+}
+
+.skeleton-shimmer::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.6) 20%,
+    rgba(255, 255, 255, 0.75) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.8s infinite;
+  content: '';
+}
+
+/* Subtle Pulse for Live & Status Badges */
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+.animate-status-pulse {
+  animation: statusPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ==========================================================================
+   Accessibility: Reduced-Motion Support
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-hero-item,
+  .page-transition,
+  .animate-mobile-menu,
+  .card-hover-lift,
+  .img-zoom-hover,
+  .section-reveal,
+  .skeleton-shimmer::after {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
