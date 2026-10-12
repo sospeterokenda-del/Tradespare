@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Shield } from 'lucide-react';
 import { AccessDenied } from './components/AccessDenied';
 import { AuthModal } from './components/AuthModal';
 import { CartDrawer } from './components/CartDrawer';
@@ -18,11 +19,22 @@ import { ProductDetailPage } from './pages/ProductDetailPage';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { BusinessProfile, Product } from './types';
 
-function MainApp() {
-  const { products, businesses, clearCart, currentUser, isSuperAdmin } = useMarketplace();
+const PROTECTED_VIEWS = ['seller-dashboard', 'customer-dashboard', 'admin-dashboard', 'post-product'];
 
-  // Navigation state
-  const [currentView, setCurrentView] = useState<string>('home');
+function MainApp() {
+  const { products, businesses, clearCart, currentUser, isSuperAdmin, isInitialAuthChecked } = useMarketplace();
+
+  // Navigation state initialized with URL hash or query param support
+  const [currentView, setCurrentView] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '').trim();
+      if (hash) return hash;
+      const urlParams = new URLSearchParams(window.location.search);
+      const param = urlParams.get('view') || urlParams.get('page');
+      if (param) return param;
+    }
+    return 'home';
+  });
   const [viewParams, setViewParams] = useState<any>({});
 
   // Selected entities
@@ -44,7 +56,62 @@ function MainApp() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState('All Locations');
 
+  // RBAC Helper Checks
+  const isGuest = currentUser.id === 'usr_guest';
+  const isAdmin = currentUser.role === 'admin';
+  const isSeller = currentUser.role === 'seller';
+  const isApprovedSeller = isSeller && currentUser.status === 'active';
+  const isPendingSeller = isSeller && currentUser.status === 'pending';
+  const isSuspended = currentUser.status === 'suspended';
+  const isRejected = currentUser.status === 'rejected';
+
+  // Fresh Sign-In Route Guard: If unauthenticated guest tries to access protected views, immediately redirect to login
+  useEffect(() => {
+    if (isInitialAuthChecked && isGuest && PROTECTED_VIEWS.includes(currentView)) {
+      let reason = 'Please sign in with your email and password to access your dashboard. Fresh sign-in is required for each browser session.';
+      if (currentView === 'admin-dashboard') {
+        reason = 'Super Admin Mode requires fresh authentication. Please sign in as Super Admin (sospeterokenda@gmail.com).';
+      } else if (currentView === 'seller-dashboard') {
+        reason = 'Seller Merchant Hub requires fresh sign-in. Please log in with your seller account.';
+      } else if (currentView === 'customer-dashboard') {
+        reason = 'Account Dashboard requires fresh sign-in. Please log in to view your orders and profile.';
+      } else if (currentView === 'post-product') {
+        reason = 'Publishing products requires fresh sign-in as an approved Seller or Admin.';
+      }
+
+      setCurrentView('login');
+      setViewParams({
+        tab: 'login',
+        redirectReason: reason,
+        redirectTo: currentView,
+      });
+    }
+  }, [isInitialAuthChecked, isGuest, currentView]);
+
   const handleNavigate = (view: string, params: any = {}) => {
+    if (isGuest && PROTECTED_VIEWS.includes(view)) {
+      let reason = 'Please sign in with your email and password to access your dashboard. Fresh sign-in is required each browser session.';
+      if (view === 'admin-dashboard') {
+        reason = 'Super Admin Mode requires fresh authentication. Please sign in as Super Admin.';
+      } else if (view === 'seller-dashboard') {
+        reason = 'Seller Merchant Hub requires fresh sign-in. Please log in with your seller account.';
+      } else if (view === 'customer-dashboard') {
+        reason = 'Account Dashboard requires fresh sign-in. Please log in to view your orders and profile.';
+      } else if (view === 'post-product') {
+        reason = 'Publishing products requires fresh sign-in as an approved Seller or Admin.';
+      }
+
+      setCurrentView('login');
+      setViewParams({
+        tab: 'login',
+        redirectReason: reason,
+        redirectTo: view,
+        ...params,
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     setCurrentView(view);
     setViewParams(params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -88,14 +155,27 @@ function MainApp() {
     setSearchQuery(query);
   };
 
-  // RBAC Helper Checks
-  const isGuest = currentUser.id === 'usr_guest';
-  const isAdmin = currentUser.role === 'admin';
-  const isSeller = currentUser.role === 'seller';
-  const isApprovedSeller = isSeller && currentUser.status === 'active';
-  const isPendingSeller = isSeller && currentUser.status === 'pending';
-  const isSuspended = currentUser.status === 'suspended';
-  const isRejected = currentUser.status === 'rejected';
+  // Loading State while verifying authentication session on protected routes (zero flash of protected content)
+  if (!isInitialAuthChecked && PROTECTED_VIEWS.includes(currentView)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-6 relative overflow-hidden">
+        <div className="absolute w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl animate-pulse pointer-events-none" />
+        <div className="relative z-10 flex flex-col items-center text-center max-w-md">
+          <div className="w-16 h-16 rounded-3xl bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center mb-6 shadow-xl shadow-indigo-500/20 animate-pulse">
+            <Shield className="w-8 h-8 text-indigo-400" />
+          </div>
+          <h2 className="text-xl font-black text-white tracking-tight mb-2">TradeSphere Security Gateway</h2>
+          <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+            Verifying session credentials and enforcing fresh sign-in security policy...
+          </p>
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-xs font-semibold text-slate-300">
+            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+            <span>Checking authentication state...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/60 font-sans text-slate-900 selection:bg-indigo-500 selection:text-white overflow-x-hidden w-full relative">
@@ -138,7 +218,9 @@ function MainApp() {
         {currentView === 'login' && (
           <LoginPage
             onNavigate={handleNavigate}
-            initialTab="login"
+            initialTab={viewParams.tab || 'login'}
+            redirectReason={viewParams.redirectReason}
+            redirectTo={viewParams.redirectTo}
           />
         )}
 
@@ -195,14 +277,11 @@ function MainApp() {
         {/* Post / Edit Product (PROTECTED: Approved Sellers & Admins Only) */}
         {currentView === 'post-product' && (
           isGuest ? (
-            <AccessDenied
-              reason="not_authenticated"
-              requiredRole="seller"
+            <LoginPage
               onNavigate={handleNavigate}
-              onOpenAuth={() => {
-                setAuthExplanation('Sign in as an approved Seller or Admin to publish products.');
-                setIsAuthModalOpen(true);
-              }}
+              initialTab="login"
+              redirectReason="Sign in with your email and password as an approved Seller or Admin to publish listings."
+              redirectTo="post-product"
             />
           ) : isSuspended ? (
             <AccessDenied
@@ -256,14 +335,11 @@ function MainApp() {
         {/* Seller Dashboard (PROTECTED: Sellers & Admins Only) */}
         {currentView === 'seller-dashboard' && (
           isGuest ? (
-            <AccessDenied
-              reason="not_authenticated"
-              requiredRole="seller"
+            <LoginPage
               onNavigate={handleNavigate}
-              onOpenAuth={() => {
-                setAuthExplanation('Sign in to access your Seller Merchant Dashboard.');
-                setIsAuthModalOpen(true);
-              }}
+              initialTab="login"
+              redirectReason="Sign in with your email and password to access your Seller Merchant Hub."
+              redirectTo="seller-dashboard"
             />
           ) : isSuspended ? (
             <AccessDenied
@@ -299,14 +375,11 @@ function MainApp() {
         {/* Customer Dashboard (PROTECTED: Authenticated Customers, Sellers & Admins) */}
         {currentView === 'customer-dashboard' && (
           isGuest ? (
-            <AccessDenied
-              reason="not_authenticated"
-              requiredRole="buyer"
+            <LoginPage
               onNavigate={handleNavigate}
-              onOpenAuth={() => {
-                setAuthExplanation('Sign in to view your orders, saved searches, and wishlist.');
-                setIsAuthModalOpen(true);
-              }}
+              initialTab="login"
+              redirectReason="Sign in with your email and password to view your orders, wishlist, and profile."
+              redirectTo="customer-dashboard"
             />
           ) : (
             <CustomerDashboard
@@ -321,14 +394,11 @@ function MainApp() {
         {/* Admin Dashboard (STRICTLY PROTECTED: Super Administrator Only) */}
         {currentView === 'admin-dashboard' && (
           isGuest ? (
-            <AccessDenied
-              reason="not_authenticated"
-              requiredRole="super_admin"
+            <LoginPage
               onNavigate={handleNavigate}
-              onOpenAuth={() => {
-                setAuthExplanation('Super Admin Mode strictly requires signing in as sospeterokenda@gmail.com.');
-                setIsAuthModalOpen(true);
-              }}
+              initialTab="login"
+              redirectReason="Super Admin Mode strictly requires signing in with your email and password (sospeterokenda@gmail.com)."
+              redirectTo="admin-dashboard"
             />
           ) : !isSuperAdmin ? (
             <AccessDenied

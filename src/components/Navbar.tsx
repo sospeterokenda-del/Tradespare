@@ -340,9 +340,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               /* User Profile Avatar & Menu (Desktop) */
               <div className="hidden md:flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    signOutUser();
-                    onNavigate('home');
+                  onClick={async () => {
+                    await signOutUser();
+                    onNavigate('login', {
+                      redirectReason: 'You have been signed out. Please sign in again with your email and password.',
+                    });
                   }}
                   className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition active:scale-95 min-h-[38px]"
                   title="Sign out of account"
@@ -463,9 +465,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     {/* Sign Out */}
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setIsUserMenuOpen(false);
-                        signOutUser();
+                        await signOutUser();
+                        onNavigate('login', {
+                          redirectReason: 'You have been signed out. Please sign in again with your email and password.',
+                        });
                       }}
                       className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 flex items-center gap-2.5"
                     >
@@ -734,10 +739,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             ) : (
               <button
-                onClick={() => {
+                onClick={async () => {
                   setIsMobileMenuOpen(false);
-                  signOutUser();
-                  onNavigate('home');
+                  await signOutUser();
+                  onNavigate('login', {
+                    redirectReason: 'You have been signed out. Please sign in again with your email and password.',
+                  });
                 }}
                 className="w-full py-3.5 px-4 rounded-2xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition min-h-[48px]"
               >

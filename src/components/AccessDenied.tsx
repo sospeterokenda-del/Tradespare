@@ -138,13 +138,15 @@ export const AccessDenied: React.FC<AccessDeniedProps> = ({
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center justify-center gap-3">
-          {reason === 'not_authenticated' && onOpenAuth && (
+          {reason === 'not_authenticated' && (
             <button
-              onClick={onOpenAuth}
+              onClick={() => onNavigate('login', {
+                redirectReason: 'Sign in with your email and password to access this page.',
+              })}
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-500/20 transition active:scale-95 flex items-center gap-2 min-h-[44px]"
             >
               <Lock className="w-4 h-4" />
-              <span>Sign In to Continue</span>
+              <span>Sign In with Email & Password</span>
             </button>
           )}
 

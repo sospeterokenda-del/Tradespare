@@ -504,7 +504,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               onClick={async () => {
                 if (window.confirm('Are you sure you want to sign out of the Super Admin session?')) {
                   await signOutUser();
-                  onNavigate('home');
+                  onNavigate('login', {
+                    redirectReason: 'Super Admin session terminated safely. Fresh sign-in required to enter Super Admin Mode.',
+                  });
                 }
               }}
               className="px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-md shadow-rose-900/30 min-h-[40px]"

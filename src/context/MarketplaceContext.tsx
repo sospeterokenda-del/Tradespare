@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
-  browserLocalPersistence,
+  inMemoryPersistence,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -61,6 +61,7 @@ interface MarketplaceContextType {
   currentUser: User;
   allUsers: User[];
   isAuthLoading: boolean;
+  isInitialAuthChecked: boolean;
   isSuperAdmin: boolean;
   products: Product[];
   businesses: BusinessProfile[];
@@ -206,7 +207,6 @@ const MarketplaceContext = createContext<MarketplaceContextType | undefined>(und
 
 const STORAGE_KEYS = {
   USERS: 'ts_users_kes_v2',
-  CURRENT_USER_ID: 'ts_active_user_id_kes_v1',
   PRODUCTS: 'ts_products_kes_v1',
   BUSINESSES: 'ts_businesses_kes_v1',
   ORDERS: 'ts_orders_kes_v1',
@@ -222,6 +222,18 @@ const STORAGE_KEYS = {
 };
 
 export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Purge any previously persisted active user ID from localStorage/sessionStorage
+  // enforcing the Fresh Sign-In Policy
+  useEffect(() => {
+    try {
+      localStorage.removeItem('ts_active_user_id_kes_v1');
+      localStorage.removeItem('ts_active_user_id_v3');
+      localStorage.removeItem('ts_active_user_id');
+      localStorage.removeItem('ts_active_user');
+      sessionStorage.clear();
+    } catch {}
+  }, []);
+
   // Users list initialized from storage or defaults with password support
   const [allUsers, setAllUsers] = useState<User[]>(() => {
     const saved =
@@ -262,13 +274,13 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return MOCK_USERS;
   });
 
-  // Current logged in user ID
-  const [currentUserId, setCurrentUserId] = useState<string>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || localStorage.getItem('ts_active_user_id_v3');
-    return saved || 'usr_customer_1';
-  });
+  // Current logged in user ID:
+  // FRESH SIGN-IN POLICY: Always starts as 'usr_guest'. Authentication is kept in-memory
+  // and never restored from localStorage across browser sessions or reloads.
+  const [currentUserId, setCurrentUserId] = useState<string>('usr_guest');
 
   const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isInitialAuthChecked, setIsInitialAuthChecked] = useState(false);
 
   const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
@@ -397,9 +409,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(sanitizedUsers));
   }, [allUsers]);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, currentUserId);
-  }, [currentUserId]);
+  // Notice: currentUserId is intentionally NOT persisted to localStorage or session restoration,
+  // strictly enforcing fresh in-memory authentication across all browser sessions and page reloads.
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
@@ -451,10 +462,11 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Sync with Firebase Auth state
   useEffect(() => {
+    let fallbackTimer: NodeJS.Timeout | null = null;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Check if user document exists in Firestore
-        try {
+      try {
+        if (firebaseUser) {
+          // Check if user document exists in Firestore
           const userDocRef = doc(db, 'users', firebaseUser.uid);
           const snap = await getDoc(userDocRef);
           if (snap.exists()) {
@@ -471,7 +483,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
             setCurrentUserId(data.id);
           } else {
             // New user via Google Auth
-            const isAdminEmail = firebaseUser.email === 'sospeterokenda@gmail.com';
+            const isAdminEmail = firebaseUser.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
             const newUser: User = {
               id: firebaseUser.uid,
               name: firebaseUser.displayName || 'Marketplace Member',
@@ -490,25 +502,43 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
               createdAt: new Date().toISOString(),
             };
 
-            await setDoc(userDocRef, newUser);
-            if (isAdminEmail) {
-              await setDoc(doc(db, 'admins', firebaseUser.uid), {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                createdAt: new Date().toISOString(),
-              });
+            try {
+              await setDoc(userDocRef, newUser);
+              if (isAdminEmail) {
+                await setDoc(doc(db, 'admins', firebaseUser.uid), {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  createdAt: new Date().toISOString(),
+                });
+              }
+            } catch (err) {
+              console.warn('Firestore set user record note:', err);
             }
 
             setAllUsers((prev) => [newUser, ...prev]);
             setCurrentUserId(newUser.id);
           }
-        } catch (error) {
-          console.error('Error syncing user with Firestore:', error);
+        } else {
+          // Fresh session, page refresh, or logged out: user is unauthenticated guest
+          setCurrentUserId('usr_guest');
         }
+      } catch (error) {
+        console.error('Error syncing user with Firestore:', error);
+        setCurrentUserId('usr_guest');
+      } finally {
+        setIsInitialAuthChecked(true);
       }
     });
 
-    return () => unsubscribe();
+    // Fallback safety timeout so protected page route guards never get stuck
+    fallbackTimer = setTimeout(() => {
+      setIsInitialAuthChecked(true);
+    }, 1200);
+
+    return () => {
+      unsubscribe();
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+    };
   }, []);
 
   // Current active user object derived strictly from registered database users
@@ -940,7 +970,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setIsAuthLoading(true);
     let fbUser;
     try {
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      await setPersistence(auth, inMemoryPersistence).catch(() => {});
       const result = await signInWithPopup(auth, googleProvider);
       fbUser = result.user;
     } catch (authError: any) {
@@ -1055,7 +1085,6 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return [userProfile, ...filtered];
       });
       setCurrentUserId(userProfile.id);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userProfile.id);
 
       if (isAdminEmail) {
         showToast(`Welcome back, Super Admin ${SUPER_ADMIN_NAME}!`, 'success');
@@ -1089,8 +1118,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         throw new Error('Password must be at least 6 characters.');
       }
 
-      // Ensure session persistence across page reloads on Netlify
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      // Enforce inMemoryPersistence: fresh session sign-in required, credentials never stored persistently
+      await setPersistence(auth, inMemoryPersistence).catch(() => {});
 
       let fbUser: any = null;
       try {
@@ -1280,7 +1309,6 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         return [userProfile, ...filtered];
       });
       setCurrentUserId(userProfile.id);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, userProfile.id);
 
       if (isAdminEmail) {
         showToast(`Super Admin authenticated: Welcome back, ${SUPER_ADMIN_NAME}!`, 'success');
@@ -1339,7 +1367,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         throw new Error('An account with this email address already exists. Please sign in.');
       }
 
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      await setPersistence(auth, inMemoryPersistence).catch(() => {});
 
       // Create user with Firebase Authentication
       let fbUid: string;
@@ -1437,7 +1465,6 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       setAllUsers((prev) => [newUser, ...prev]);
       setCurrentUserId(newUser.id);
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, newUser.id);
 
       if (status === 'pending') {
         showToast(
@@ -1579,11 +1606,16 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.warn('Firebase signOut note:', signOutErr);
     }
     setCurrentUserId('usr_guest');
-    localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, 'usr_guest');
+    try {
+      localStorage.removeItem('ts_active_user_id_kes_v1');
+      localStorage.removeItem('ts_active_user_id_v3');
+      localStorage.removeItem('ts_active_user_id');
+      sessionStorage.clear();
+    } catch {}
     showToast(
       wasSuperAdmin
-        ? 'Super Admin signed out safely. Returned to public view.'
-        : 'Signed out successfully',
+        ? 'Super Admin signed out safely. Fresh sign-in required.'
+        : 'Signed out successfully. Fresh sign-in required.',
       'info'
     );
   };
@@ -1598,7 +1630,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const runDemoAuthCheck = async (): Promise<{ success: boolean; message: string }> => {
     setIsAuthLoading(true);
     try {
-      await setPersistence(auth, browserLocalPersistence).catch(() => {});
+      await setPersistence(auth, inMemoryPersistence).catch(() => {});
       let isVerified = false;
 
       try {
@@ -2474,6 +2506,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         currentUser,
         allUsers,
         isAuthLoading,
+        isInitialAuthChecked,
         isSuperAdmin,
         products,
         businesses,

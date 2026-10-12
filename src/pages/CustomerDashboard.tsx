@@ -172,9 +172,11 @@ export const CustomerDashboard: React.FC<CustomerDashboardProps> = ({
             <span>Browse Products</span>
           </button>
           <button
-            onClick={() => {
-              signOutUser();
-              onNavigate('home');
+            onClick={async () => {
+              await signOutUser();
+              onNavigate('login', {
+                redirectReason: 'You have signed out of your Customer account. Please sign in again to access your orders and profile.',
+              });
             }}
             className="w-full sm:w-auto px-4 py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center justify-center gap-2 transition min-h-[44px]"
             title="Sign out of customer account"

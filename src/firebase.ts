@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   setPersistence,
-  browserLocalPersistence,
+  inMemoryPersistence,
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
@@ -21,6 +21,7 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRIT
 export const auth = getAuth(app);
 
 export {
+  inMemoryPersistence,
   updatePassword,
   updateProfile,
   signInWithPopup,
@@ -30,9 +31,9 @@ export {
   firebaseSignOut,
 };
 
-// Explicitly set browserLocalPersistence so user sessions persist across page reloads on Netlify
+// Enforce inMemoryPersistence: users must sign in fresh each session, no persistence across tabs, browser restarts, or storage restoration
 if (typeof window !== 'undefined') {
-  setPersistence(auth, browserLocalPersistence).catch((err) => {
+  setPersistence(auth, inMemoryPersistence).catch((err) => {
     console.warn('Firebase setPersistence notice:', err);
   });
 }

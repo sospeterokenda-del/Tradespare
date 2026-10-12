@@ -206,9 +206,11 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
           )}
 
           <button
-            onClick={() => {
-              signOutUser();
-              onNavigate('home');
+            onClick={async () => {
+              await signOutUser();
+              onNavigate('login', {
+                redirectReason: 'You have signed out of your Seller session. Please sign in again to manage your store.',
+              });
             }}
             className="w-full sm:w-auto px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-2 border border-white/10 min-h-[44px]"
             title="Sign out of seller session"

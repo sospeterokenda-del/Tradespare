@@ -28,11 +28,15 @@ import { UserRole } from '../types';
 interface LoginPageProps {
   onNavigate: (view: string, params?: any) => void;
   initialTab?: 'login' | 'register' | 'recovery';
+  redirectReason?: string;
+  redirectTo?: string;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigate,
   initialTab = 'login',
+  redirectReason,
+  redirectTo,
 }) => {
   const {
     loginWithCredentials,
@@ -73,7 +77,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
 
   // Register Form State
   const [regName, setRegName] = useState('');
@@ -123,7 +126,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   // Handle Role-Based Post-Login Navigation
   const handleRoleRedirect = (user: { role: UserRole; status: string; email?: string }) => {
-    if (user.role === 'admin' || user.email?.toLowerCase() === 'sospeterokenda@gmail.com') {
+    const isSuperAdminUser = user.role === 'admin' || user.email?.toLowerCase() === 'sospeterokenda@gmail.com';
+
+    // If redirected from a protected page, check permissions and route accordingly
+    if (redirectTo) {
+      if (redirectTo === 'admin-dashboard') {
+        if (isSuperAdminUser) {
+          onNavigate('admin-dashboard');
+          return;
+        }
+      } else if (redirectTo === 'seller-dashboard' || redirectTo === 'post-product') {
+        if (user.role === 'seller' || isSuperAdminUser) {
+          onNavigate(redirectTo);
+          return;
+        }
+      } else if (redirectTo === 'customer-dashboard') {
+        onNavigate('customer-dashboard');
+        return;
+      }
+    }
+
+    // Default Role Dashboard Routing
+    if (isSuperAdminUser) {
       onNavigate('admin-dashboard');
     } else if (user.role === 'seller') {
       onNavigate('seller-dashboard');
@@ -399,6 +423,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
 
           <div className="p-6 sm:p-8 space-y-5">
+            {/* Protected Route Redirect Explanation */}
+            {redirectReason && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-2.5 text-amber-900 text-xs animate-in fade-in duration-150">
+                <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Fresh Sign-In Required</p>
+                  <p className="mt-0.5 leading-relaxed text-amber-800">{redirectReason}</p>
+                </div>
+              </div>
+            )}
+
             {/* Error Notification */}
             {errorMsg && (
               <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-2.5 text-rose-800 text-xs animate-in fade-in duration-150">
@@ -514,16 +549,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                    />
-                    <span>Keep me logged in securely</span>
-                  </label>
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                  <span>Fresh session security active: Authentication is strictly in-memory</span>
                 </div>
 
                 <button
